@@ -16,6 +16,7 @@ import {
   Settings,
   X,
   ShieldCheck,
+  Barcode,
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 
@@ -40,6 +41,7 @@ export default function Sidebar({
     { label: 'Live Scanner', href: '/live', icon: Camera, roles: ['super_admin', 'admin', 'guard'] },
     { label: 'Student Directory', href: '/students', icon: Users, roles: ['super_admin', 'admin', 'faculty', 'guard', 'viewer'] },
     { label: 'Student Vehicles', href: '/vehicles', icon: Car, roles: ['super_admin', 'admin', 'faculty', 'guard', 'viewer'] },
+    { label: 'Barcode Management', href: '/barcode', icon: Barcode, roles: ['super_admin', 'admin', 'faculty', 'guard', 'viewer'] },
     { label: 'Entry Logs', href: '/access-logs?mode=entry', icon: LogIn, roles: ['super_admin', 'admin', 'faculty', 'guard', 'viewer'] },
     { label: 'Exit Logs', href: '/access-logs?mode=exit', icon: LogOut, roles: ['super_admin', 'admin', 'faculty', 'guard', 'viewer'] },
     { label: 'Gate Barrier Control', href: '/gates', icon: SquareActivity, roles: ['super_admin', 'admin', 'guard'] },

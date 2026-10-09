@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import DashboardLayout from '@/components/DashboardLayout';
 import BulkUploadModal from '@/components/BulkUploadModal';
+import BarcodeRenderer from '@/components/BarcodeRenderer';
 import {
   Users,
   Search,
@@ -925,8 +926,13 @@ export default function StudentsPage() {
               {barcodeModal.student_number} • {barcodeModal.course || barcodeModal.department || barcodeModal.person_type}
             </p>
 
-            <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-4 font-mono text-sm font-bold text-slate-800">
-              {barcodeModal.qr_code || `QR-${barcodeModal.student_number}`}
+            <div className="mt-4">
+              <BarcodeRenderer
+                value={barcodeModal.qr_code || barcodeModal.student_number}
+                height={80}
+                width={1.9}
+                fontSize={13}
+              />
             </div>
 
             <p className="mt-2 text-[11px] text-slate-400">
