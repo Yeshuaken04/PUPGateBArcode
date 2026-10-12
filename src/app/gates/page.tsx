@@ -1,17 +1,18 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import DashboardLayout from '@/components/DashboardLayout';
 import { SquareActivity, Wifi, WifiOff, ShieldCheck, Clock, Settings, RefreshCw } from 'lucide-react';
 import ManualOpenModal from '@/components/ManualOpenModal';
+import { createClient } from '@/lib/supabase/client';
 
 export default function GatesPage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedGate, setSelectedGate] = useState<any>(null);
-
-  const gates = [
+  const [loading, setLoading] = useState(false);
+  const [gates, setGates] = useState<any[]>([
     {
-      id: 'g1',
+      id: '15b9bef4-1a49-4ec2-9518-2aae640f0b73',
       gate_code: 'GATE-01',
       gate_name: 'Main Campus Entrance Barrier',
       location: 'Front Gate Turnstile / Vehicle Boom',
@@ -20,10 +21,10 @@ export default function GatesPage() {
       active: true,
       relay_pulse_ms: 800,
       status: 'ONLINE',
-      last_seen: 'Just now (12s ago)',
+      last_seen: 'Online (Connected)',
     },
     {
-      id: 'g2',
+      id: 'c2671244-4cd7-4490-b751-0acfffd354ac',
       gate_code: 'GATE-02',
       gate_name: 'Main Campus Exit Barrier',
       location: 'Exit Gate Turnstile / Vehicle Boom',
@@ -32,9 +33,32 @@ export default function GatesPage() {
       active: true,
       relay_pulse_ms: 800,
       status: 'ONLINE',
-      last_seen: 'Just now (18s ago)',
+      last_seen: 'Online (Connected)',
     },
-  ];
+  ]);
+
+  const loadGates = async () => {
+    setLoading(true);
+    try {
+      const supabase = createClient();
+      const { data, error } = await supabase.from('gates').select('*').order('gate_code', { ascending: true });
+      if (!error && data && data.length > 0) {
+        setGates(data.map((g) => ({
+          ...g,
+          status: g.active ? 'ONLINE' : 'OFFLINE',
+          last_seen: g.last_seen_at ? new Date(g.last_seen_at).toLocaleTimeString() : 'Online (Connected)',
+        })));
+      }
+    } catch {
+      // fallback to initial state
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadGates();
+  }, []);
 
   return (
     <DashboardLayout

@@ -15,6 +15,7 @@ import {
   ShieldAlert,
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
+import { isValidUUID } from '@/lib/utils';
 import { Vehicle, Student } from '@/types/database';
 import { VehicleFormSchema } from '@/lib/validation/schemas';
 
@@ -52,11 +53,11 @@ export default function VehiclesPage() {
       if (vehicleData && vehicleData.length > 0) {
         setVehicles(vehicleData as any);
       } else {
-        // Mock fallback
+        // Fallback data for offline mode with real RFC4122 UUIDs
         setVehicles([
           {
-            id: 'v1',
-            student_id: 's1',
+            id: 'eb0d191d-9125-4266-8d17-c1a64098e1ab',
+            student_id: 'b7db68a3-8dff-4bf4-a8fc-fd56d6df4cbc',
             plate_number: 'ABC-1234',
             brand_model: 'Yamaha Aerox 155',
             vehicle_type: 'motorcycle',
@@ -64,7 +65,7 @@ export default function VehiclesPage() {
             is_active: true,
             created_at: '',
             student: {
-              id: 's1',
+              id: 'b7db68a3-8dff-4bf4-a8fc-fd56d6df4cbc',
               student_number: '2021-12345',
               first_name: 'Juan',
               last_name: 'Dela Cruz',
@@ -76,8 +77,8 @@ export default function VehiclesPage() {
             },
           },
           {
-            id: 'v2',
-            student_id: 's2',
+            id: 'f84fc8c4-b1cb-4d70-94fe-2d878a9b84a4',
+            student_id: 'e835b631-1b86-414d-a499-998025381282',
             plate_number: 'DEF-5678',
             brand_model: 'Honda Click 125',
             vehicle_type: 'motorcycle',
@@ -85,7 +86,7 @@ export default function VehiclesPage() {
             is_active: true,
             created_at: '',
             student: {
-              id: 's2',
+              id: 'e835b631-1b86-414d-a499-998025381282',
               student_number: '2022-06789',
               first_name: 'Maria',
               last_name: 'Santos',
@@ -97,8 +98,8 @@ export default function VehiclesPage() {
             },
           },
           {
-            id: 'v3',
-            student_id: 's3',
+            id: '0f3b794e-e212-44e3-b258-4340cf657634',
+            student_id: '07176a69-2b3c-4304-9fb8-1738899a06f5',
             plate_number: 'GHI-9012',
             brand_model: 'Toyota Vios',
             vehicle_type: 'car',
@@ -106,10 +107,10 @@ export default function VehiclesPage() {
             is_active: true,
             created_at: '',
             student: {
-              id: 's3',
-              student_number: 'FAC-2020-045',
-              first_name: 'Ricardo',
-              last_name: 'Alvarez',
+              id: '07176a69-2b3c-4304-9fb8-1738899a06f5',
+              student_number: '2021-09876',
+              first_name: 'Mark',
+              last_name: 'Reyes',
               person_type: 'faculty',
               course: '',
               status: 'active',
@@ -218,8 +219,24 @@ export default function VehiclesPage() {
 
     try {
       const supabase = createClient();
+
+      let targetStudentId = selectedStudent.id;
+      if (!isValidUUID(targetStudentId)) {
+        const { data: realStudent } = await supabase
+          .from('students')
+          .select('id')
+          .eq('student_number', selectedStudent.student_number)
+          .maybeSingle();
+
+        if (realStudent?.id) {
+          targetStudentId = realStudent.id;
+        } else {
+          throw new Error(`Hindi nahanap ang profile ni ${selectedStudent.first_name} ${selectedStudent.last_name} sa database.`);
+        }
+      }
+
       const payload = {
-        student_id: selectedStudent.id,
+        student_id: targetStudentId,
         plate_number: form.plate_number.trim().toUpperCase(),
         brand_model: form.brand_model.trim(),
         vehicle_type: form.vehicle_type,

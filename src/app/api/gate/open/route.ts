@@ -45,28 +45,53 @@ export async function POST(request: NextRequest) {
     const ip = request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown';
     const adminClient = getAdminClient();
 
+    // Safely resolve gateId to a valid UUID
+    let resolvedGateId = gateId;
+    const isGateUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(gateId);
+    if (!isGateUUID) {
+      const { data: g } = await adminClient
+        .from('gates')
+        .select('id')
+        .or(`gate_code.eq.${gateId},device_id.eq.${gateId}`)
+        .limit(1)
+        .maybeSingle();
+
+      if (g?.id) {
+        resolvedGateId = g.id;
+      } else {
+        const { data: firstGate } = await adminClient.from('gates').select('id').limit(1).maybeSingle();
+        if (firstGate?.id) resolvedGateId = firstGate.id;
+      }
+    }
+
+    // Safely check profileId (must be a valid UUID or null)
+    const isProfileUUID = profileId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(profileId);
+    const safeProfileId = isProfileUUID ? profileId : null;
+
     // 3. Insert Audit Record into gate_actions
     const { data: actionRecord, error: actionError } = await adminClient
       .from('gate_actions')
       .insert({
-        gate_id: gateId,
-        initiated_by: profileId,
+        gate_id: resolvedGateId,
+        initiated_by: safeProfileId,
         action: 'open',
         reason,
         ip_address: ip,
       })
       .select('id, created_at')
-      .single();
+      .maybeSingle();
 
     if (actionError) {
       console.warn('[MANUAL_OPEN_AUDIT_FALLBACK]', actionError.message);
     }
 
     // 4. Update gate status
-    await adminClient
-      .from('gates')
-      .update({ last_seen_at: new Date().toISOString() })
-      .eq('id', gateId);
+    if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(resolvedGateId)) {
+      await adminClient
+        .from('gates')
+        .update({ last_seen_at: new Date().toISOString() })
+        .eq('id', resolvedGateId);
+    }
 
     return NextResponse.json({
       success: true,

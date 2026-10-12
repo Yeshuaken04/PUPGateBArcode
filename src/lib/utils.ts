@@ -66,3 +66,8 @@ export function isToday(isoString?: string | null): boolean {
     return false;
   }
 }
+
+export function isValidUUID(val: any): boolean {
+  if (!val || typeof val !== 'string') return false;
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(val.trim());
+}

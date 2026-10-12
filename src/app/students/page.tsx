@@ -23,6 +23,7 @@ import {
   ShieldAlert,
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
+import { isValidUUID } from '@/lib/utils';
 import { Student, StudentStatus, PersonType } from '@/types/database';
 import { StudentFormSchema } from '@/lib/validation/schemas';
 
@@ -80,13 +81,13 @@ export default function StudentsPage() {
         .select('*')
         .order('student_number', { ascending: true });
 
-      if (!error && data && data.length > 0) {
+      if (!error && data) {
         setStudents(data);
       } else {
-        // Mock fallback data for offline/demo
+        // Fallback data for offline mode with real RFC4122 UUIDs
         setStudents([
           {
-            id: 's1',
+            id: 'b7db68a3-8dff-4bf4-a8fc-fd56d6df4cbc',
             student_number: '2021-12345',
             first_name: 'Juan',
             middle_name: 'M.',
@@ -104,7 +105,7 @@ export default function StudentsPage() {
             updated_at: new Date().toISOString(),
           },
           {
-            id: 's2',
+            id: 'e835b631-1b86-414d-a499-998025381282',
             student_number: '2022-06789',
             first_name: 'Maria',
             middle_name: 'S.',
@@ -122,11 +123,11 @@ export default function StudentsPage() {
             updated_at: new Date().toISOString(),
           },
           {
-            id: 's3',
-            student_number: 'FAC-2020-045',
-            first_name: 'Ricardo',
-            middle_name: 'G.',
-            last_name: 'Alvarez',
+            id: '07176a69-2b3c-4304-9fb8-1738899a06f5',
+            student_number: '2021-09876',
+            first_name: 'Mark',
+            middle_name: 'P.',
+            last_name: 'Reyes',
             person_type: 'faculty',
             course: '',
             department: 'College of Engineering',
@@ -140,7 +141,7 @@ export default function StudentsPage() {
             updated_at: new Date().toISOString(),
           },
           {
-            id: 's4',
+            id: 'a4798783-2a3d-4e0c-bece-c86b89b81fad',
             student_number: '2023-11223',
             first_name: 'Ana',
             middle_name: 'L.',
@@ -158,7 +159,7 @@ export default function StudentsPage() {
             updated_at: new Date().toISOString(),
           },
           {
-            id: 's5',
+            id: 'f1e2d3c4-b5a6-4978-8899-aabbccddeeff',
             student_number: 'VIS-2024-889',
             first_name: 'Corazon',
             middle_name: '',
@@ -312,12 +313,24 @@ export default function StudentsPage() {
         status: validData.status,
       };
 
-      if (form.id) {
+      if (form.id && isValidUUID(form.id)) {
         const { error } = await supabase.from('students').update(payload).eq('id', form.id);
         if (error) throw error;
       } else {
-        const { error } = await supabase.from('students').insert(payload);
-        if (error) throw error;
+        // If updating without UUID or adding new student, check if already in database by student_number
+        const { data: existing } = await supabase
+          .from('students')
+          .select('id')
+          .eq('student_number', payload.student_number)
+          .maybeSingle();
+
+        if (existing?.id) {
+          const { error } = await supabase.from('students').update(payload).eq('id', existing.id);
+          if (error) throw error;
+        } else {
+          const { error } = await supabase.from('students').insert(payload);
+          if (error) throw error;
+        }
       }
 
       setModalOpen(false);

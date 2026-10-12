@@ -7,9 +7,10 @@ import { createClient } from '@/lib/supabase/client';
 import { Profile } from '@/types/database';
 
 export default function UsersPage() {
+  const [loading, setLoading] = useState(false);
   const [profiles, setProfiles] = useState<Profile[]>([
     {
-      id: 'u1',
+      id: 'a1b2c3d4-e5f6-4a1b-8c2d-3e4f5a6b7c8d',
       full_name: 'System Super Administrator',
       role: 'super_admin',
       active: true,
@@ -17,7 +18,7 @@ export default function UsersPage() {
       updated_at: new Date().toISOString(),
     },
     {
-      id: 'u2',
+      id: 'b2c3d4e5-f6a1-4b2c-9d3e-4f5a6b7c8d9e',
       full_name: 'PUP Gate Guard 01',
       role: 'guard',
       active: true,
@@ -25,7 +26,7 @@ export default function UsersPage() {
       updated_at: new Date().toISOString(),
     },
     {
-      id: 'u3',
+      id: 'c3d4e5f6-a1b2-4c3d-0e4f-5a6b7c8d9e0f',
       full_name: 'Campus Security Operator',
       role: 'admin',
       active: true,
@@ -33,6 +34,24 @@ export default function UsersPage() {
       updated_at: new Date().toISOString(),
     },
   ]);
+
+  useEffect(() => {
+    async function loadProfiles() {
+      setLoading(true);
+      try {
+        const supabase = createClient();
+        const { data, error } = await supabase.from('profiles').select('*').order('created_at', { ascending: true });
+        if (!error && data && data.length > 0) {
+          setProfiles(data);
+        }
+      } catch {
+        // keep initial fallback
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadProfiles();
+  }, []);
 
   return (
     <DashboardLayout
