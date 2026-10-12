@@ -17,6 +17,7 @@ import {
   X,
   ShieldCheck,
   Barcode,
+  UserCheck,
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 
@@ -39,11 +40,12 @@ export default function Sidebar({
   const navItems = [
     { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard, roles: ['super_admin', 'admin', 'faculty', 'guard', 'viewer'] },
     { label: 'Live Scanner', href: '/live', icon: Camera, roles: ['super_admin', 'admin', 'guard'] },
-    { label: 'Student Directory', href: '/students', icon: Users, roles: ['super_admin', 'admin', 'faculty', 'guard', 'viewer'] },
-    { label: 'Student Vehicles', href: '/vehicles', icon: Car, roles: ['super_admin', 'admin', 'faculty', 'guard', 'viewer'] },
-    { label: 'Barcode Management', href: '/barcode', icon: Barcode, roles: ['super_admin', 'admin', 'faculty', 'guard', 'viewer'] },
-    { label: 'Entry Logs', href: '/access-logs?mode=entry', icon: LogIn, roles: ['super_admin', 'admin', 'faculty', 'guard', 'viewer'] },
-    { label: 'Exit Logs', href: '/access-logs?mode=exit', icon: LogOut, roles: ['super_admin', 'admin', 'faculty', 'guard', 'viewer'] },
+    { label: 'Student Directory', href: '/students', icon: Users, roles: ['super_admin', 'admin', 'faculty', 'viewer'] },
+    { label: 'Visitor Pass Directory', href: '/students?type=visitor', icon: UserCheck, roles: ['guard'] },
+    { label: 'Student Vehicles', href: '/vehicles', icon: Car, roles: ['super_admin', 'admin', 'faculty', 'viewer'] },
+    { label: 'Barcode Passes', href: '/barcode', icon: Barcode, roles: ['super_admin', 'admin', 'faculty', 'guard', 'viewer'] },
+    { label: 'Entry Logs', href: '/access-logs?mode=entry', icon: LogIn, roles: ['super_admin', 'admin', 'guard', 'faculty', 'viewer'] },
+    { label: 'Exit Logs', href: '/access-logs?mode=exit', icon: LogOut, roles: ['super_admin', 'admin', 'guard', 'faculty', 'viewer'] },
     { label: 'Gate Barrier Control', href: '/gates', icon: SquareActivity, roles: ['super_admin', 'admin', 'guard'] },
     { label: 'Reports & Analytics', href: '/reports', icon: BarChart3, roles: ['super_admin', 'admin', 'faculty', 'viewer'] },
     { label: 'Users & Roles', href: '/users', icon: UserCog, roles: ['super_admin', 'admin'] },

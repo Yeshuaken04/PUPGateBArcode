@@ -8,7 +8,6 @@ import { createClient } from '@/lib/supabase/client';
 const DEMO_ACCOUNTS = [
   { username: 'admin', password: 'PUPBataan@123', full_name: 'System Administrator', role: 'admin', email: 'admin@pup.edu.ph' },
   { username: 'guard', password: 'guard123', full_name: 'PUP Gate Guard', role: 'guard', email: 'guard@pup.edu.ph' },
-  { username: 'faculty', password: 'faculty123', full_name: 'Prof. Maria Santos', role: 'faculty', email: 'faculty@pup.edu.ph' },
   { username: 'operator', password: 'operator123', full_name: 'Security Operator', role: 'admin', email: 'operator@pup.edu.ph' },
 ];
 
@@ -237,7 +236,7 @@ export default function LoginPage() {
               <div className="text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-2">
                 Quick Demo Accounts (1-Click Fill):
               </div>
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-2 gap-2">
                 <button
                   type="button"
                   onClick={() => handleSelectDemo('admin', 'PUPBataan@123')}
@@ -253,14 +252,6 @@ export default function LoginPage() {
                 >
                   <div>Guard</div>
                   <div className="text-[10px] font-mono text-slate-400">guard</div>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleSelectDemo('faculty', 'faculty123')}
-                  className="rounded-lg border border-slate-200 bg-white p-2 text-center text-[11px] font-bold text-slate-700 hover:border-pup-700 hover:text-pup-800 transition"
-                >
-                  <div>Faculty</div>
-                  <div className="text-[10px] font-mono text-slate-400">faculty</div>
                 </button>
               </div>
             </div>

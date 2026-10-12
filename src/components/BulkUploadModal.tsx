@@ -41,6 +41,9 @@ interface ParsedRow {
   contact_number?: string;
   rfid_uid?: string;
   qr_code?: string;
+  plate_number?: string;
+  vehicle_model?: string;
+  vehicle_type?: string;
   status: StudentStatus;
   isValid: boolean;
   errors: string[];
@@ -88,6 +91,8 @@ export default function BulkUploadModal({
         Section: 'A',
         'Contact Number': '09171234567',
         'RFID UID': 'RFID-A101',
+        'Plate Number': 'ABC-1234',
+        'Vehicle Model': 'Yamaha Aerox 155',
         Status: 'active',
       },
       {
@@ -102,6 +107,8 @@ export default function BulkUploadModal({
         Section: '',
         'Contact Number': '09181234567',
         'RFID UID': 'RFID-FAC-10',
+        'Plate Number': 'DEF-5678',
+        'Vehicle Model': 'Honda Click 125',
         Status: 'active',
       },
       {
@@ -116,6 +123,8 @@ export default function BulkUploadModal({
         Section: '',
         'Contact Number': '09191234567',
         'RFID UID': 'RFID-STF-04',
+        'Plate Number': '',
+        'Vehicle Model': '',
         Status: 'active',
       },
       {
@@ -130,6 +139,8 @@ export default function BulkUploadModal({
         Section: '',
         'Contact Number': '09201234567',
         'RFID UID': '',
+        'Plate Number': 'XYZ-9988',
+        'Vehicle Model': 'Toyota Vios',
         Status: 'active',
       },
     ];
@@ -194,6 +205,9 @@ export default function BulkUploadModal({
           const rfid = getVal('rfiduid', 'rfid_uid', 'rfid', 'carduid', 'card');
           const qr = getVal('qrcode', 'qr_code', 'qr');
           const rawStatus = getVal('status', 'estado');
+          const plateNumber = getVal('platenumber', 'plate_number', 'plate', 'plaka');
+          const vehicleModel = getVal('vehiclemodel', 'vehicle_model', 'brandmodel', 'brand_model', 'model', 'sasakyan');
+          const rawVehicleType = getVal('vehicletype', 'vehicle_type', 'uring_sasakyan');
 
           // Strict ID Check
           if (!idNum) {
@@ -301,6 +315,9 @@ export default function BulkUploadModal({
             contact_number: cleanedContact,
             rfid_uid: rfid || undefined,
             qr_code: qr || `QR-${idNum}`,
+            plate_number: plateNumber ? plateNumber.toUpperCase() : undefined,
+            vehicle_model: vehicleModel || undefined,
+            vehicle_type: rawVehicleType.toLowerCase().includes('car') || rawVehicleType.toLowerCase().includes('kotse') ? 'car' : 'motorcycle',
             status,
             isValid: errors.length === 0,
             errors,
@@ -353,12 +370,33 @@ export default function BulkUploadModal({
 
       for (let i = 0; i < batchData.length; i += BATCH_SIZE) {
         const chunk = batchData.slice(i, i + BATCH_SIZE);
-        const { error } = await supabase.from('students').upsert(chunk, {
-          onConflict: 'student_number',
-        });
+        const { data: upsertedStudents, error } = await supabase
+          .from('students')
+          .upsert(chunk, { onConflict: 'student_number' })
+          .select('id, student_number');
 
         if (error) {
           throw new Error(`Database Error: ${error.message}`);
+        }
+
+        // Auto-register vehicles if plate numbers were included
+        if (upsertedStudents && upsertedStudents.length > 0) {
+          const vehiclesChunk: any[] = [];
+          for (const s of upsertedStudents) {
+            const originalRow = validRows.find((r) => r.student_number === s.student_number);
+            if (originalRow && originalRow.plate_number) {
+              vehiclesChunk.push({
+                student_id: s.id,
+                plate_number: originalRow.plate_number.toUpperCase(),
+                brand_model: originalRow.vehicle_model || 'Campus Vehicle',
+                vehicle_type: originalRow.vehicle_type || 'motorcycle',
+                is_active: true,
+              });
+            }
+          }
+          if (vehiclesChunk.length > 0) {
+            await supabase.from('vehicles').upsert(vehiclesChunk, { onConflict: 'plate_number' });
+          }
         }
 
         processed += chunk.length;

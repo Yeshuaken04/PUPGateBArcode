@@ -23,6 +23,7 @@ import {
   Building2,
   ShieldCheck,
   Camera,
+  Trash2,
 } from 'lucide-react';
 import {
   AreaChart,
@@ -56,6 +57,48 @@ export default function DashboardPage() {
   const [entriesTodayCount, setEntriesTodayCount] = useState<number>(0);
   const [exitsTodayCount, setExitsTodayCount] = useState<number>(0);
   const [deniedTodayCount, setDeniedTodayCount] = useState<number>(0);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  const handleDeleteLog = async (id: string) => {
+    if (!confirm('Sigurado ka bang nais mong burahin ang scan log na ito mula sa dashboard at database?')) return;
+    setDeletingId(id);
+    try {
+      const supabase = createClient();
+      const { error } = await supabase.from('access_logs').delete().eq('id', id);
+      if (!error) {
+        setLogs((prev) => prev.filter((l) => l.id !== id));
+        fetchDashboardData();
+      } else {
+        alert('Hindi nabura ang log: ' + error.message);
+      }
+    } catch (err: any) {
+      alert(err?.message || 'Error habang binubura ang log');
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
+  const handleClearAllLogs = async () => {
+    if (!confirm('Sigurado ka bang nais mong burahin ang LAHAT ng kasalukuyang gate logs sa dashboard at database?')) return;
+    setLoading(true);
+    try {
+      const supabase = createClient();
+      const { error } = await supabase.from('access_logs').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+      if (!error) {
+        setLogs([]);
+        setEntriesTodayCount(0);
+        setExitsTodayCount(0);
+        setDeniedTodayCount(0);
+      } else {
+        alert('Hindi nabura ang mga log: ' + error.message);
+      }
+    } catch (err: any) {
+      alert(err?.message || 'Error');
+    } finally {
+      setLoading(false);
+      fetchDashboardData();
+    }
+  };
 
   const fetchDashboardData = async () => {
     setLoading(true);
@@ -589,13 +632,25 @@ export default function DashboardPage() {
               </div>
             </div>
 
-            <Link
-              href={recentTab === 'entry' ? '/access-logs?mode=entry' : '/access-logs?mode=exit'}
-              className="flex items-center gap-1 text-xs font-bold text-pup-700 hover:underline"
-            >
-              <span>View All {recentTab === 'entry' ? 'Entry' : 'Exit'} Logs</span>
-              <ArrowRight className="h-3.5 w-3.5" />
-            </Link>
+            <div className="flex items-center gap-2">
+              {(userRole === 'admin' || userRole === 'super_admin') && logs.length > 0 && (
+                <button
+                  type="button"
+                  onClick={handleClearAllLogs}
+                  className="flex items-center gap-1.5 rounded-lg border border-rose-200 bg-rose-50 px-2.5 py-1.5 text-xs font-semibold text-rose-700 hover:bg-rose-100 hover:text-rose-800 transition"
+                >
+                  <Trash2 className="h-3.5 w-3.5 text-rose-600" />
+                  <span>Clear All Logs</span>
+                </button>
+              )}
+              <Link
+                href={recentTab === 'entry' ? '/access-logs?mode=entry' : '/access-logs?mode=exit'}
+                className="flex items-center gap-1 text-xs font-bold text-pup-700 hover:underline"
+              >
+                <span>View All {recentTab === 'entry' ? 'Entry' : 'Exit'} Logs</span>
+                <ArrowRight className="h-3.5 w-3.5" />
+              </Link>
+            </div>
           </div>
 
           <div className="overflow-x-auto">
@@ -609,6 +664,9 @@ export default function DashboardPage() {
                   <th className="px-4 py-3">Credential</th>
                   <th className="px-4 py-3">Gate</th>
                   <th className="px-4 py-3">Result</th>
+                  {(userRole === 'admin' || userRole === 'super_admin') && (
+                    <th className="px-4 py-3 text-right">Aksyon</th>
+                  )}
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -672,12 +730,26 @@ export default function DashboardPage() {
                             </span>
                           )}
                         </td>
+                        {(userRole === 'admin' || userRole === 'super_admin') && (
+                          <td className="px-4 py-3 text-right">
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteLog(log.id)}
+                              disabled={deletingId === log.id}
+                              className="inline-flex items-center gap-1 rounded-lg border border-rose-200 bg-rose-50 px-2.5 py-1 text-[11px] font-bold text-rose-700 hover:bg-rose-100 hover:text-rose-800 transition disabled:opacity-50"
+                              title="Burahin ang scan record na ito"
+                            >
+                              <Trash2 className="h-3 w-3" />
+                              <span>{deletingId === log.id ? '...' : 'Delete'}</span>
+                            </button>
+                          </td>
+                        )}
                       </tr>
                     );
                   })
                 ) : (
                   <tr>
-                    <td colSpan={7} className="py-12 text-center text-xs text-slate-400">
+                    <td colSpan={(userRole === 'admin' || userRole === 'super_admin') ? 8 : 7} className="py-12 text-center text-xs text-slate-400">
                       <div className="flex flex-col items-center justify-center gap-2">
                         <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-slate-100 text-slate-400">
                           <Camera className="h-5 w-5" />

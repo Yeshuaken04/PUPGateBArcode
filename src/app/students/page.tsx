@@ -38,6 +38,41 @@ export default function StudentsPage() {
   const [barcodeModal, setBarcodeModal] = useState<Student | null>(null);
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [currentUserRole, setCurrentUserRole] = useState<'super_admin' | 'admin' | 'faculty' | 'guard' | 'viewer'>('admin');
+
+  // Detect current user role on mount and set appropriate filter
+  useEffect(() => {
+    async function checkRole() {
+      try {
+        const supabase = createClient();
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single();
+          if (profile?.role) {
+            const role = profile.role as any;
+            setCurrentUserRole(role);
+            if (role === 'guard') setTypeFilter('visitor');
+            return;
+          }
+        }
+        if (typeof document !== 'undefined') {
+          const match = document.cookie.match(/pup_gate_demo_session=([^;]+)/);
+          if (match && match[1]) {
+            const role = match[1] as any;
+            setCurrentUserRole(role);
+            if (role === 'guard') setTypeFilter('visitor');
+          }
+        }
+      } catch {}
+    }
+    checkRole();
+
+    if (typeof window !== 'undefined') {
+      const urlParams = new URLSearchParams(window.location.search);
+      const urlType = urlParams.get('type');
+      if (urlType) setTypeFilter(urlType);
+    }
+  }, []);
 
   // Form State
   const [form, setForm] = useState<{
@@ -215,17 +250,18 @@ export default function StudentsPage() {
   }, [students, search, statusFilter, typeFilter]);
 
   const handleOpenAdd = () => {
+    const isGuard = currentUserRole === 'guard';
     setForm({
       id: '',
-      student_number: '',
+      student_number: isGuard ? `VIS-${Date.now().toString().slice(-6)}` : '',
       first_name: '',
       middle_name: '',
       last_name: '',
-      person_type: 'student',
-      department: '',
-      course: 'BSIT',
-      year_level: '1',
-      section: 'A',
+      person_type: isGuard ? 'visitor' : 'student',
+      department: isGuard ? 'Guest / Campus Visitor' : '',
+      course: isGuard ? 'N/A' : 'BSIT',
+      year_level: isGuard ? '' : '1',
+      section: isGuard ? '' : 'A',
       contact_number: '',
       rfid_uid: '',
       qr_code: '',
@@ -237,13 +273,17 @@ export default function StudentsPage() {
   };
 
   const handleEdit = (s: Student) => {
+    if (currentUserRole === 'guard' && s.person_type !== 'visitor') {
+      alert('Bilang Gate Guard, ang mga Visitor Pass records lamang ang may pahintulot kang baguhin.');
+      return;
+    }
     setForm({
       id: s.id,
       student_number: s.student_number,
       first_name: s.first_name,
       middle_name: s.middle_name || '',
       last_name: s.last_name,
-      person_type: s.person_type || 'student',
+      person_type: s.person_type || (currentUserRole === 'guard' ? 'visitor' : 'student'),
       department: s.department || '',
       course: s.course || '',
       year_level: s.year_level ? String(s.year_level) : '',
@@ -342,8 +382,8 @@ export default function StudentsPage() {
 
   return (
     <DashboardLayout
-      title="Student & Personnel Verification Directory"
-      subtitle="Masterlist ng mga enrolled students, faculty, staff, at visitors na awtorisadong pumasok sa gate"
+      title={currentUserRole === 'guard' ? 'Visitor Pass Directory & Temporary Campus Access' : 'Student & Personnel Verification Directory'}
+      subtitle={currentUserRole === 'guard' ? 'Pamamahala ng mga visitor at guest gate passes para sa gate security' : 'Masterlist ng mga enrolled students, faculty, staff, at visitors na awtorisadong pumasok sa gate'}
     >
       <div className="space-y-4">
         {/* Controls & Quick Actions */}
@@ -355,7 +395,7 @@ export default function StudentsPage() {
                 type="text"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                placeholder="Mag-search gamit ang ID, pangalan, kurso, o RFID..."
+                placeholder={currentUserRole === 'guard' ? 'Mag-search gamit ang Pass ID, pangalan, o opisina...' : 'Mag-search gamit ang ID, pangalan, kurso, o RFID...'}
                 className="w-full rounded-xl border border-slate-300 py-2.5 pl-10 pr-4 text-sm outline-none focus:border-pup-700 focus:ring-1 focus:ring-pup-700"
               />
             </div>
@@ -395,14 +435,16 @@ export default function StudentsPage() {
               <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
             </button>
 
-            {/* Bulk Upload Button */}
-            <button
-              onClick={() => setBulkModalOpen(true)}
-              className="flex items-center gap-1.5 rounded-xl border border-pup-200 bg-pup-50 px-3.5 py-2.5 text-xs font-bold text-pup-900 shadow-sm hover:bg-pup-100 transition"
-            >
-              <FileSpreadsheet className="h-4 w-4 text-pup-700" />
-              <span>Bulk Upload (Excel / CSV)</span>
-            </button>
+            {/* Bulk Upload Button (Hidden for Guard) */}
+            {currentUserRole !== 'guard' && (
+              <button
+                onClick={() => setBulkModalOpen(true)}
+                className="flex items-center gap-1.5 rounded-xl border border-pup-200 bg-pup-50 px-3.5 py-2.5 text-xs font-bold text-pup-900 shadow-sm hover:bg-pup-100 transition"
+              >
+                <FileSpreadsheet className="h-4 w-4 text-pup-700" />
+                <span>Bulk Upload (Excel / CSV)</span>
+              </button>
+            )}
 
             {/* Single Add Button */}
             <button
@@ -410,7 +452,7 @@ export default function StudentsPage() {
               className="flex items-center gap-1.5 rounded-xl bg-pup-700 px-4 py-2.5 text-xs font-bold text-white shadow-sm hover:bg-pup-800 transition"
             >
               <Plus className="h-4 w-4" />
-              <span>Mag-register</span>
+              <span>{currentUserRole === 'guard' ? 'Mag-issue ng Visitor Pass' : 'Mag-rehistro'}</span>
             </button>
           </div>
         </div>
@@ -506,13 +548,19 @@ export default function StudentsPage() {
                           >
                             <Barcode className="h-4 w-4" />
                           </button>
-                          <button
-                            onClick={() => handleEdit(s)}
-                            title="I-edit"
-                            className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100 hover:text-pup-700"
-                          >
-                            <Edit className="h-4 w-4" />
-                          </button>
+                          {currentUserRole === 'guard' && s.person_type !== 'visitor' ? (
+                            <span className="text-[10px] font-semibold text-slate-400 italic px-2">
+                              Protected
+                            </span>
+                          ) : (
+                            <button
+                              onClick={() => handleEdit(s)}
+                              title={currentUserRole === 'guard' ? 'I-edit ang Visitor Pass' : 'I-edit'}
+                              className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100 hover:text-pup-700"
+                            >
+                              <Edit className="h-4 w-4" />
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -537,10 +585,14 @@ export default function StudentsPage() {
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <div>
                 <h3 className="text-base font-black text-slate-900">
-                  {form.id ? 'I-edit ang Record' : 'Mag-register ng Student / Personnel'}
+                  {currentUserRole === 'guard'
+                    ? form.id ? 'I-edit ang Visitor Pass' : 'Mag-issue ng Bagong Visitor Pass'
+                    : form.id ? 'I-edit ang Record' : 'Mag-register ng Student / Personnel'}
                 </h3>
                 <p className="text-xs text-slate-500">
-                  Mahigpit ang pag-verify: Letra lang sa pangalan, numero lang sa numeric fields, bawal ang &quot;-1&quot;.
+                  {currentUserRole === 'guard'
+                    ? 'Mag-isyu ng temporary visitor barcode pass para sa bisita ng campus.'
+                    : 'Mahigpit ang pag-verify: Letra lang sa pangalan, numero lang sa numeric fields, bawal ang "-1".'}
                 </p>
               </div>
               <button
@@ -567,9 +619,10 @@ export default function StudentsPage() {
                     Role / Classification *
                   </label>
                   <select
+                    disabled={currentUserRole === 'guard'}
                     value={form.person_type}
                     onChange={(e) => setForm({ ...form, person_type: e.target.value as PersonType })}
-                    className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm font-semibold outline-none focus:border-pup-700"
+                    className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm font-semibold outline-none focus:border-pup-700 disabled:bg-slate-100 disabled:text-slate-500"
                   >
                     <option value="student">Student (Mag-aaral)</option>
                     <option value="faculty">Faculty / Teacher (Guro)</option>

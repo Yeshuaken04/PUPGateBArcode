@@ -36,6 +36,13 @@ export default function DashboardLayout({ children, title, subtitle }: Dashboard
           } else {
             setUserFullName(user.email?.split('@')[0] || 'Administrator');
           }
+        } else if (typeof document !== 'undefined') {
+          const match = document.cookie.match(/pup_gate_demo_session=([^;]+)/);
+          if (match && match[1]) {
+            const role = match[1];
+            setUserRole(role);
+            setUserFullName(role === 'guard' ? 'PUP Gate Guard' : 'System Administrator');
+          }
         }
       } catch {
         // demo fallback
