@@ -218,34 +218,24 @@ export default function VehiclesPage() {
     }
 
     try {
-      const supabase = createClient();
-
-      let targetStudentId = selectedStudent.id;
-      if (!isValidUUID(targetStudentId)) {
-        const { data: realStudent } = await supabase
-          .from('students')
-          .select('id')
-          .eq('student_number', selectedStudent.student_number)
-          .maybeSingle();
-
-        if (realStudent?.id) {
-          targetStudentId = realStudent.id;
-        } else {
-          throw new Error(`Hindi nahanap ang profile ni ${selectedStudent.first_name} ${selectedStudent.last_name} sa database.`);
-        }
-      }
-
       const payload = {
-        student_id: targetStudentId,
+        student_id: selectedStudent.id || selectedStudent.student_number,
         plate_number: form.plate_number.trim().toUpperCase(),
         brand_model: form.brand_model.trim(),
         vehicle_type: form.vehicle_type,
         color: form.color.trim() || null,
-        is_active: true,
       };
 
-      const { error } = await supabase.from('vehicles').insert(payload);
-      if (error) throw error;
+      const res = await fetch('/api/vehicles', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      const resData = await res.json();
+      if (!res.ok) {
+        throw new Error(resData.error || 'Hindi na-save ang sasakyan. Pakisuri kung may kaparehong plate number na.');
+      }
 
       setModalOpen(false);
       loadData();

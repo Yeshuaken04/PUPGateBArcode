@@ -274,8 +274,8 @@ export default function BulkUploadModal({
               errors.push('Bawal ang negative o "-1" sa Year Level.');
             } else {
               const num = parseInt(rawYear, 10);
-              if (isNaN(num) || num < 1 || num > 6) {
-                errors.push('Year level must be between 1 and 6.');
+              if (isNaN(num) || num < 1 || num > 4) {
+                errors.push('Year level must be between 1 and 4 (Hanggang 4th year lamang).');
               } else {
                 yearLevel = num;
               }
@@ -364,44 +364,32 @@ export default function BulkUploadModal({
         status: r.status,
       }));
 
-      // Upsert in batches of 50
-      const BATCH_SIZE = 50;
-      let processed = 0;
+      // Prepare vehicles data
+      const vehiclesData = validRows
+        .filter((r) => r.plate_number)
+        .map((r) => ({
+          student_number: r.student_number,
+          plate_number: r.plate_number,
+          vehicle_model: r.vehicle_model,
+          vehicle_type: r.vehicle_type,
+        }));
 
-      for (let i = 0; i < batchData.length; i += BATCH_SIZE) {
-        const chunk = batchData.slice(i, i + BATCH_SIZE);
-        const { data: upsertedStudents, error } = await supabase
-          .from('students')
-          .upsert(chunk, { onConflict: 'student_number' })
-          .select('id, student_number');
+      // Call server API route with admin privileges (completely bypasses RLS)
+      setUploadProgress(50);
+      const res = await fetch('/api/students/bulk', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          students: batchData,
+          vehicles: vehiclesData,
+        }),
+      });
 
-        if (error) {
-          throw new Error(`Database Error: ${error.message}`);
-        }
-
-        // Auto-register vehicles if plate numbers were included
-        if (upsertedStudents && upsertedStudents.length > 0) {
-          const vehiclesChunk: any[] = [];
-          for (const s of upsertedStudents) {
-            const originalRow = validRows.find((r) => r.student_number === s.student_number);
-            if (originalRow && originalRow.plate_number) {
-              vehiclesChunk.push({
-                student_id: s.id,
-                plate_number: originalRow.plate_number.toUpperCase(),
-                brand_model: originalRow.vehicle_model || 'Campus Vehicle',
-                vehicle_type: originalRow.vehicle_type || 'motorcycle',
-                is_active: true,
-              });
-            }
-          }
-          if (vehiclesChunk.length > 0) {
-            await supabase.from('vehicles').upsert(vehiclesChunk, { onConflict: 'plate_number' });
-          }
-        }
-
-        processed += chunk.length;
-        setUploadProgress(Math.round((processed / batchData.length) * 90) + 10);
+      const resData = await res.json();
+      if (!res.ok) {
+        throw new Error(resData.error || 'Nabigo ang pag-upload sa database.');
       }
+      setUploadProgress(100);
 
       // Calculate summary
       const summary = {

@@ -334,10 +334,10 @@ export default function StudentsPage() {
     }
 
     try {
-      const supabase = createClient();
       const validData = validationResult.data;
 
       const payload = {
+        id: form.id || undefined,
         student_number: validData.student_number,
         first_name: validData.first_name,
         middle_name: validData.middle_name,
@@ -353,30 +353,35 @@ export default function StudentsPage() {
         status: validData.status,
       };
 
-      if (form.id && isValidUUID(form.id)) {
-        const { error } = await supabase.from('students').update(payload).eq('id', form.id);
-        if (error) throw error;
-      } else {
-        // If updating without UUID or adding new student, check if already in database by student_number
-        const { data: existing } = await supabase
-          .from('students')
-          .select('id')
-          .eq('student_number', payload.student_number)
-          .maybeSingle();
+      const res = await fetch('/api/students', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
 
-        if (existing?.id) {
-          const { error } = await supabase.from('students').update(payload).eq('id', existing.id);
-          if (error) throw error;
-        } else {
-          const { error } = await supabase.from('students').insert(payload);
-          if (error) throw error;
-        }
+      const resData = await res.json();
+      if (!res.ok) {
+        throw new Error(resData.error || 'Hindi na-save sa database. Pakisubukang muli.');
       }
 
       setModalOpen(false);
       loadStudents();
     } catch (err: any) {
       setSubmitError(err?.message || 'Hindi na-save sa database. Pakisubukang muli.');
+    }
+  };
+
+  const handleDeleteStudent = async (studentId: string, studentName: string) => {
+    if (!confirm(`Sigurado ka bang nais mong burahin ang record ni ${studentName}?`)) return;
+    try {
+      const res = await fetch(`/api/students?id=${encodeURIComponent(studentId)}`, {
+        method: 'DELETE',
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Hindi nabura ang record.');
+      loadStudents();
+    } catch (err: any) {
+      alert(err?.message || 'Error sa pagbura ng record.');
     }
   };
 
@@ -553,13 +558,24 @@ export default function StudentsPage() {
                               Protected
                             </span>
                           ) : (
-                            <button
-                              onClick={() => handleEdit(s)}
-                              title={currentUserRole === 'guard' ? 'I-edit ang Visitor Pass' : 'I-edit'}
-                              className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100 hover:text-pup-700"
-                            >
-                              <Edit className="h-4 w-4" />
-                            </button>
+                            <>
+                              <button
+                                onClick={() => handleEdit(s)}
+                                title={currentUserRole === 'guard' ? 'I-edit ang Visitor Pass' : 'I-edit'}
+                                className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100 hover:text-pup-700"
+                              >
+                                <Edit className="h-4 w-4" />
+                              </button>
+                              {(currentUserRole === 'admin' || currentUserRole === 'super_admin') && (
+                                <button
+                                  onClick={() => handleDeleteStudent(s.id, `${s.first_name} ${s.last_name}`)}
+                                  title="Burahin ang Record"
+                                  className="rounded-lg p-1.5 text-slate-400 hover:bg-rose-50 hover:text-rose-600 transition"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </button>
+                              )}
+                            </>
                           )}
                         </div>
                       </td>
@@ -813,12 +829,12 @@ export default function StudentsPage() {
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div>
                   <label className="block text-xs font-bold uppercase text-slate-600 mb-1">
-                    Year Level (1-6)
+                    Year Level (1-4)
                   </label>
                   <input
                     type="number"
                     min={1}
-                    max={6}
+                    max={4}
                     value={form.year_level}
                     onChange={(e) => {
                       const val = e.target.value;
@@ -827,6 +843,11 @@ export default function StudentsPage() {
                         setFormErrors((prev) => ({
                           ...prev,
                           year_level: 'Bawal ang "-1" o negative na taon.',
+                        }));
+                      } else if (Number(val) > 4) {
+                        setFormErrors((prev) => ({
+                          ...prev,
+                          year_level: 'Hanggang 4th year lamang (1 hanggang 4).',
                         }));
                       } else {
                         setFormErrors((prev) => {

@@ -81,8 +81,8 @@ export const StudentFormSchema = z.object({
       const num = Number(val);
       return isNaN(num) ? null : num;
     })
-    .refine((num) => num === null || (num >= 1 && num <= 6), {
-      message: 'Year level must be between 1 and 6 (negative values or "-1" are strictly prohibited).',
+    .refine((num) => num === null || (num >= 1 && num <= 4), {
+      message: 'Year level must be between 1 and 4 (Hanggang 4th year lamang. Negative values or "-1" are strictly prohibited).',
     }),
 
   section: z.string().trim().max(10).optional().nullable(),
