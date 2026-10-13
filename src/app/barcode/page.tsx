@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import DashboardLayout from '@/components/DashboardLayout';
 import BarcodeRenderer from '@/components/BarcodeRenderer';
+import JsBarcode from 'jsbarcode';
 import {
   Barcode,
   Printer,
@@ -47,8 +48,8 @@ export default function BarcodePage() {
     setLoading(true);
     try {
       const [sRes, vRes] = await Promise.all([
-        fetch('/api/students'),
-        fetch('/api/vehicles'),
+        fetch('/api/students', { cache: 'no-store' }),
+        fetch('/api/vehicles', { cache: 'no-store' }),
       ]);
       const [sJson, vJson] = await Promise.all([
         sRes.json(),
@@ -161,11 +162,11 @@ export default function BarcodePage() {
         ? `${activeStudent.student_number} • ${activeStudent.course || activeStudent.person_type.toUpperCase()} ${
             activeStudent.year_level ? `- Year ${activeStudent.year_level}` : ''
           }${activeStudent.section ? ` Sec ${activeStudent.section}` : ''}`
-        : 'Pumili ng estudyante'
+        : 'Select student'
       : selectedType === 'vehicle'
       ? activeVehicle
-        ? `May-ari: ${activeVehicle.student?.first_name || ''} ${activeVehicle.student?.last_name || ''} (${activeVehicle.vehicle_type})`
-        : 'Pumili ng sasakyan'
+        ? `Owner: ${activeVehicle.student?.first_name || ''} ${activeVehicle.student?.last_name || ''} (${activeVehicle.vehicle_type})`
+        : 'Select vehicle'
       : 'User Defined Barcode Value';
 
   // Chunk array for A4 pages (8 cards per sheet: 2 columns × 4 rows)
@@ -178,6 +179,156 @@ export default function BarcodePage() {
     }
     return pages;
   }, [filteredStudents]);
+
+  const downloadBarcodeOnlyAsPng = () => {
+    try {
+      const barcodeCanvas = document.createElement('canvas');
+      JsBarcode(barcodeCanvas, currentBarcodeValue, {
+        format: 'CODE128',
+        width: 3.5,
+        height: 140,
+        displayValue: true,
+        fontSize: 22,
+        font: 'monospace',
+        textMargin: 8,
+        margin: 16,
+        background: '#ffffff',
+        lineColor: '#0f172a',
+      });
+      const link = document.createElement('a');
+      link.download = `PUP-Barcode-${currentBarcodeValue.replace(/[^a-zA-Z0-9-]/g, '')}.png`;
+      link.href = barcodeCanvas.toDataURL('image/png');
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch (err: any) {
+      alert('Error generating barcode image: ' + (err?.message || 'Unknown error'));
+    }
+  };
+
+  const downloadSingleCardAsPng = () => {
+    try {
+      const canvas = document.createElement('canvas');
+      canvas.width = 1012;
+      canvas.height = 638;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
+
+      // Background: Clean white
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      // Maroon Outer Border
+      ctx.lineWidth = 14;
+      ctx.strokeStyle = '#800000';
+      ctx.strokeRect(7, 7, canvas.width - 14, canvas.height - 14);
+
+      // Gold Accent Border
+      ctx.lineWidth = 4;
+      ctx.strokeStyle = '#d97706';
+      ctx.strokeRect(18, 18, canvas.width - 36, canvas.height - 36);
+
+      // Header text
+      ctx.fillStyle = '#800000';
+      ctx.font = 'bold 26px Arial, sans-serif';
+      ctx.textAlign = 'left';
+      ctx.fillText('POLYTECHNIC UNIVERSITY OF THE PHILIPPINES', 115, 66);
+
+      ctx.fillStyle = '#d97706';
+      ctx.font = 'bold 18px Arial, sans-serif';
+      ctx.fillText('BATAAN BRANCH • AUTOMATED GATE PASS', 115, 96);
+
+      // Header divider line
+      ctx.strokeStyle = '#e2e8f0';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(35, 120);
+      ctx.lineTo(canvas.width - 35, 120);
+      ctx.stroke();
+
+      // Student Title / Full Name
+      ctx.fillStyle = '#0f172a';
+      ctx.font = '900 34px Arial, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(currentTitle, canvas.width / 2, 175);
+
+      // Subtitle
+      ctx.fillStyle = '#475569';
+      ctx.font = 'bold 22px Arial, sans-serif';
+      ctx.fillText(currentSubtitle, canvas.width / 2, 215);
+
+      // Barcode stripes via JsBarcode
+      const barcodeCanvas = document.createElement('canvas');
+      try {
+        JsBarcode(barcodeCanvas, currentBarcodeValue, {
+          format: 'CODE128',
+          width: 3.5,
+          height: 155,
+          displayValue: true,
+          fontSize: 24,
+          font: 'monospace',
+          textMargin: 8,
+          margin: 10,
+          background: '#ffffff',
+          lineColor: '#0f172a',
+        });
+        const bWidth = barcodeCanvas.width;
+        const bX = (canvas.width - bWidth) / 2;
+        ctx.drawImage(barcodeCanvas, bX, 260);
+      } catch {
+        ctx.fillStyle = '#0f172a';
+        ctx.font = 'bold 28px monospace';
+        ctx.fillText(currentBarcodeValue, canvas.width / 2, 360);
+      }
+
+      // Footer divider line
+      ctx.strokeStyle = '#e2e8f0';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(35, 545);
+      ctx.lineTo(canvas.width - 35, 545);
+      ctx.stroke();
+
+      // Footer badges
+      ctx.fillStyle = '#059669';
+      ctx.font = 'bold 18px Arial, sans-serif';
+      ctx.textAlign = 'left';
+      ctx.fillText('✔ Official Gate Barrier Compatible', 45, 585);
+
+      ctx.fillStyle = '#64748b';
+      ctx.font = 'bold 18px Arial, sans-serif';
+      ctx.textAlign = 'right';
+      ctx.fillText('S.Y. 2026–2027', canvas.width - 45, 585);
+
+      // Draw PUP Seal emblem synchronously (guaranteed non-tainting)
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(72, 72, 28, 0, Math.PI * 2);
+      ctx.fillStyle = '#800000';
+      ctx.fill();
+      ctx.lineWidth = 3;
+      ctx.strokeStyle = '#d97706';
+      ctx.stroke();
+      ctx.fillStyle = '#ffffff';
+      ctx.font = 'bold 14px Arial, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('PUP', 72, 72);
+      ctx.restore();
+
+      // Trigger instant safe download
+      const dataUrl = canvas.toDataURL('image/png');
+      const link = document.createElement('a');
+      link.download = `PUP-Pass-${currentBarcodeValue.replace(/[^a-zA-Z0-9-]/g, '')}.png`;
+      link.href = dataUrl;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch (err: any) {
+      console.error('Single card PNG error:', err);
+      downloadBarcodeOnlyAsPng();
+    }
+  };
 
   const handlePrintSingle = () => {
     setPrintTarget('single');
@@ -196,29 +347,24 @@ export default function BarcodePage() {
   return (
     <DashboardLayout
       title="Barcode Pass Generator & Management"
-      subtitle="Gumawa, sumuri, at mag-print ng opisyal na 1D Code 128 barcodes para sa student IDs (single o bulk A4 sheet)"
+      subtitle="Generate, preview, and print official 1D Code 128 barcodes for student IDs (single or bulk A4 sheet)"
     >
       {/* Print CSS Styles injected inline */}
       <style jsx global>{`
         @media print {
+          * {
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+            color-adjust: exact !important;
+          }
           body * {
             visibility: hidden !important;
           }
-          #print-surface-single,
-          #print-surface-single *,
+          ${printTarget === 'bulk'
+            ? `
           #print-surface-bulk,
           #print-surface-bulk * {
             visibility: visible !important;
-          }
-          #print-surface-single {
-            display: block !important;
-            position: absolute !important;
-            left: 0 !important;
-            top: 0 !important;
-            width: 85.6mm !important;
-            height: 54mm !important;
-            margin: 0 !important;
-            padding: 0 !important;
           }
           #print-surface-bulk {
             display: block !important;
@@ -237,6 +383,26 @@ export default function BarcodePage() {
             page-break-after: always !important;
             break-after: page !important;
           }
+          `
+            : `
+          #single-id-printable,
+          #single-id-printable * {
+            visibility: visible !important;
+          }
+          #single-id-printable {
+            display: block !important;
+            position: absolute !important;
+            left: 10mm !important;
+            top: 10mm !important;
+            width: 85.6mm !important;
+            min-height: 54mm !important;
+            margin: 0 !important;
+            padding: 16px !important;
+            background: white !important;
+            border: 2px solid #800000 !important;
+            box-shadow: none !important;
+          }
+          `}
         }
       `}</style>
 
@@ -294,10 +460,10 @@ export default function BarcodePage() {
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-600">
                 <Filter className="h-4 w-4 text-pup-700" />
-                <span>Pumili ng Kurso, Taon (Grade 1-4), at Seksyon</span>
+                <span>Filter by Course, Year Level (1-4), and Section</span>
               </div>
               <span className="text-xs font-semibold text-pup-800 bg-pup-50 px-2.5 py-0.5 rounded-full border border-pup-200">
-                {filteredStudents.length} estudyante ang tumutugma
+                {filteredStudents.length} matching students
               </span>
             </div>
 
@@ -305,14 +471,14 @@ export default function BarcodePage() {
               {/* Course */}
               <div>
                 <label className="block text-[11px] font-bold uppercase text-slate-500 mb-1">
-                  Kurso / Program
+                  Course / Program
                 </label>
                 <select
                   value={courseFilter}
                   onChange={(e) => setCourseFilter(e.target.value)}
                   className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-800 outline-none focus:border-pup-700"
                 >
-                  <option value="all">Lahat ng Kurso</option>
+                  <option value="all">All Courses</option>
                   {availableCourses.map((c) => (
                     <option key={c} value={c}>
                       {c}
@@ -324,14 +490,14 @@ export default function BarcodePage() {
               {/* Year Level (Grade 1-4) */}
               <div>
                 <label className="block text-[11px] font-bold uppercase text-slate-500 mb-1">
-                  Year Level (Taon)
+                  Year Level
                 </label>
                 <select
                   value={yearFilter}
                   onChange={(e) => setYearFilter(e.target.value)}
                   className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-800 outline-none focus:border-pup-700"
                 >
-                  <option value="all">Lahat ng Taon (1st-4th)</option>
+                  <option value="all">All Year Levels (1st-4th)</option>
                   <option value="1">1st Year</option>
                   <option value="2">2nd Year</option>
                   <option value="3">3rd Year</option>
@@ -342,17 +508,17 @@ export default function BarcodePage() {
               {/* Section */}
               <div>
                 <label className="block text-[11px] font-bold uppercase text-slate-500 mb-1">
-                  Seksyon (Section)
+                  Section
                 </label>
                 <select
                   value={sectionFilter}
                   onChange={(e) => setSectionFilter(e.target.value)}
                   className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-800 outline-none focus:border-pup-700"
                 >
-                  <option value="all">Lahat ng Seksyon</option>
+                  <option value="all">All Sections</option>
                   {availableSections.map((sec) => (
                     <option key={sec} value={sec}>
-                      Seksyon {sec}
+                      Section {sec}
                     </option>
                   ))}
                 </select>
@@ -361,7 +527,7 @@ export default function BarcodePage() {
               {/* Search text */}
               <div>
                 <label className="block text-[11px] font-bold uppercase text-slate-500 mb-1">
-                  Pangalan o Student ID
+                  Name or Student ID
                 </label>
                 <div className="relative">
                   <Search className="absolute left-3 top-2.5 h-3.5 w-3.5 text-slate-400" />
@@ -369,7 +535,7 @@ export default function BarcodePage() {
                     type="text"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder="Mag-search..."
+                    placeholder="Search students..."
                     className="w-full rounded-xl border border-slate-300 bg-white py-1.5 pl-8 pr-3 text-xs outline-none focus:border-pup-700"
                   />
                 </div>
@@ -386,10 +552,10 @@ export default function BarcodePage() {
               <div className="flex items-center justify-between border-b border-slate-100 pb-3">
                 <h3 className="text-sm font-black text-slate-900">
                   {selectedType === 'student'
-                    ? 'Piliin ang Estudyante'
+                    ? 'Select Student'
                     : selectedType === 'vehicle'
-                    ? 'Piliin ang Rehistradong Sasakyan'
-                    : 'I-type ang Barcode Value'}
+                    ? 'Select Registered Vehicle'
+                    : 'Enter Barcode Value'}
                 </h3>
                 <span className="rounded-md bg-pup-100 px-2 py-0.5 text-[10px] font-bold text-pup-800">
                   CODE 128
@@ -400,7 +566,7 @@ export default function BarcodePage() {
               {selectedType === 'student' && (
                 <div className="space-y-3">
                   <label className="block text-xs font-bold uppercase text-slate-600">
-                    Estudyante para sa Single Pass
+                    Student for Single ID Pass
                   </label>
                   {filteredStudents.length > 0 ? (
                     <select
@@ -417,19 +583,37 @@ export default function BarcodePage() {
                     </select>
                   ) : (
                     <div className="rounded-xl border border-dashed border-slate-300 p-4 text-center text-xs text-slate-500">
-                      Walang estudyanteng tumutugma sa napiling kurso/taon/seksyon. Baguhin ang filter sa itaas.
+                      No students match the selected course/year/section filter.
                     </div>
                   )}
 
-                  {/* Dual Action Buttons: Single and Bulk */}
+                  {/* Action Buttons: Download Card PNG, Download Barcode Only, Print Single, and Bulk A4 */}
                   <div className="pt-2 space-y-2">
+                    <button
+                      onClick={downloadSingleCardAsPng}
+                      disabled={!activeStudent}
+                      className="flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-700 py-3 text-xs font-bold text-white shadow-sm hover:bg-emerald-800 transition disabled:opacity-50 cursor-pointer"
+                    >
+                      <Download className="h-4 w-4" />
+                      <span>Download Single Pass ID Card (PNG Image File)</span>
+                    </button>
+
+                    <button
+                      onClick={downloadBarcodeOnlyAsPng}
+                      disabled={!activeStudent}
+                      className="flex w-full items-center justify-center gap-2 rounded-xl border border-emerald-300 bg-emerald-50 py-2.5 text-xs font-bold text-emerald-800 shadow-2xs hover:bg-emerald-100 transition disabled:opacity-50 cursor-pointer"
+                    >
+                      <Barcode className="h-4 w-4 text-emerald-700" />
+                      <span>Download Barcode Only (PNG Sticker)</span>
+                    </button>
+
                     <button
                       onClick={handlePrintSingle}
                       disabled={!activeStudent}
                       className="flex w-full items-center justify-center gap-2 rounded-xl bg-pup-700 py-3 text-xs font-bold text-white shadow-sm hover:bg-pup-800 transition disabled:opacity-50 cursor-pointer"
                     >
-                      <CreditCard className="h-4 w-4" />
-                      <span>I-print ang Single ID Pass (85.6mm × 54mm)</span>
+                      <Printer className="h-4 w-4" />
+                      <span>Print Single ID Pass (85.6mm × 54mm / PDF)</span>
                     </button>
 
                     <button
@@ -439,7 +623,7 @@ export default function BarcodePage() {
                     >
                       <FileSpreadsheet className="h-4 w-4 text-pup-700" />
                       <span>
-                        Bulk A4 Bond Paper Print ({filteredStudents.length} Estudyante • {bulkA4Pages.length} Pahina)
+                        Bulk A4 Bond Paper Print ({filteredStudents.length} Students • {bulkA4Pages.length} Sheet{bulkA4Pages.length !== 1 ? 's' : ''})
                       </span>
                     </button>
                   </div>
@@ -450,7 +634,7 @@ export default function BarcodePage() {
               {selectedType === 'vehicle' && (
                 <div className="space-y-3">
                   <label className="block text-xs font-bold uppercase text-slate-600">
-                    Rehistradong Plaka ng Sasakyan
+                    Registered License Plate
                   </label>
                   {vehicles.length > 0 ? (
                     <select
@@ -466,7 +650,7 @@ export default function BarcodePage() {
                     </select>
                   ) : (
                     <div className="rounded-xl border border-dashed border-slate-300 p-4 text-center text-xs text-slate-500">
-                      Wala pang sasakyang nakarehistro sa database.
+                      No vehicles currently registered in database.
                     </div>
                   )}
 
@@ -477,7 +661,7 @@ export default function BarcodePage() {
                       className="flex w-full items-center justify-center gap-2 rounded-xl bg-pup-700 py-3 text-xs font-bold text-white shadow-sm hover:bg-pup-800 transition cursor-pointer"
                     >
                       <Printer className="h-4 w-4" />
-                      <span>I-print ang Vehicle Gate Sticker Pass</span>
+                      <span>Print Vehicle Gate Sticker Pass</span>
                     </button>
                   </div>
                 </div>
@@ -493,7 +677,7 @@ export default function BarcodePage() {
                     type="text"
                     value={customValue}
                     onChange={(e) => setCustomValue(e.target.value.toUpperCase())}
-                    placeholder="Hal. 2026-PUP-001 o ABC-1234"
+                    placeholder="e.g. 2026-PUP-001 or ABC-1234"
                     className="w-full rounded-xl border border-slate-300 px-3 py-2.5 text-sm font-mono font-bold uppercase outline-none focus:border-pup-700"
                   />
                   <div className="pt-2">
@@ -502,7 +686,7 @@ export default function BarcodePage() {
                       className="flex w-full items-center justify-center gap-2 rounded-xl bg-pup-700 py-3 text-xs font-bold text-white shadow-sm hover:bg-pup-800 transition cursor-pointer"
                     >
                       <Printer className="h-4 w-4" />
-                      <span>I-print ang Custom Barcode</span>
+                      <span>Print Custom Barcode</span>
                     </button>
                   </div>
                 </div>
@@ -515,9 +699,34 @@ export default function BarcodePage() {
             <div className="rounded-3xl border border-slate-200 bg-slate-50/70 p-6 shadow-sm flex flex-col items-center justify-center">
               <div className="mb-3 flex items-center justify-between w-full max-w-md">
                 <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
-                  Exact ID Card Size Preview (85.6mm × 54mm)
+                  Exact ID Card Size (85.6mm × 54mm)
                 </span>
-                <span className="text-[11px] font-mono text-slate-400">CR80 Standard</span>
+                <div className="flex items-center gap-1.5">
+                  <button
+                    onClick={downloadBarcodeOnlyAsPng}
+                    title="Download barcode stripes only as PNG"
+                    className="flex items-center gap-1 rounded-lg border border-emerald-300 bg-emerald-50 px-2.5 py-1 text-[11px] font-bold text-emerald-800 hover:bg-emerald-100 transition cursor-pointer"
+                  >
+                    <Barcode className="h-3 w-3" />
+                    <span>Barcode Only</span>
+                  </button>
+                  <button
+                    onClick={downloadSingleCardAsPng}
+                    title="Download full ID card as PNG image file"
+                    className="flex items-center gap-1 rounded-lg bg-emerald-600 px-2.5 py-1 text-[11px] font-bold text-white hover:bg-emerald-700 transition cursor-pointer"
+                  >
+                    <Download className="h-3 w-3" />
+                    <span>Card PNG</span>
+                  </button>
+                  <button
+                    onClick={handlePrintSingle}
+                    title="Print or save as PDF"
+                    className="flex items-center gap-1 rounded-lg bg-pup-700 px-2.5 py-1 text-[11px] font-bold text-white hover:bg-pup-800 transition cursor-pointer"
+                  >
+                    <Printer className="h-3 w-3" />
+                    <span>Print / PDF</span>
+                  </button>
+                </div>
               </div>
 
               {/* ID Card with PUP Branding */}
@@ -571,7 +780,7 @@ export default function BarcodePage() {
 
               <div className="mt-4 flex items-center justify-center gap-2 text-xs text-slate-500 text-center max-w-sm">
                 <ShieldCheck className="h-4 w-4 text-emerald-600" />
-                <span>Sakto ang sukat para sa plastic ID badge holder at student RFID sleeve.</span>
+                <span>Standard size for plastic ID badge holders and student RFID sleeves.</span>
               </div>
             </div>
           </div>
@@ -587,10 +796,10 @@ export default function BarcodePage() {
               <div>
                 <h3 className="text-base font-black text-slate-900 flex items-center gap-2">
                   <FileSpreadsheet className="h-5 w-5 text-pup-800" />
-                  <span>Bulk Print sa A4 Bond Paper (8 ID Cards / Sheet)</span>
+                  <span>Bulk Print on A4 Paper (8 ID Cards / Sheet)</span>
                 </h3>
                 <p className="text-xs text-slate-500 mt-0.5">
-                  Naka-format para sa Standard A4 (210mm × 297mm). Eksaktong 8 ID cards bawat bond paper na may cut guidelines.
+                  Formatted for Standard A4 (210mm × 297mm). Exactly 8 ID cards per sheet with cutting guidelines.
                 </p>
               </div>
               <button
@@ -604,15 +813,15 @@ export default function BarcodePage() {
             {/* Print action bar */}
             <div className="flex items-center justify-between bg-slate-50 rounded-2xl p-3 my-4 border border-slate-200">
               <div className="text-xs text-slate-700 font-semibold">
-                Kabuuang Estudyante: <span className="font-bold text-pup-800">{filteredStudents.length}</span> •
-                Mga Pahina ng A4 Bond Paper: <span className="font-bold text-pup-800">{bulkA4Pages.length} sheet(s)</span>
+                Total Students: <span className="font-bold text-pup-800">{filteredStudents.length}</span> •
+                A4 Paper Sheets: <span className="font-bold text-pup-800">{bulkA4Pages.length} sheet(s)</span>
               </div>
               <button
                 onClick={handlePrintBulk}
                 className="flex items-center gap-2 rounded-xl bg-pup-700 px-4 py-2.5 text-xs font-bold text-white shadow-sm hover:bg-pup-800 transition cursor-pointer"
               >
                 <Printer className="h-4 w-4" />
-                <span>I-print Ngayon sa A4 Bond Paper (Print / PDF)</span>
+                <span>Print Now on A4 Paper (Print / PDF)</span>
               </button>
             </div>
 
@@ -681,7 +890,7 @@ export default function BarcodePage() {
                         {/* Cut Line Hint */}
                         <div className="flex items-center justify-between text-[8px] text-slate-400 border-t border-slate-100 pt-1">
                           <span>S.Y. 2026–2027</span>
-                          <span className="font-mono text-[7px] text-slate-300">✂ GUPITIN DITO</span>
+                          <span className="font-mono text-[7px] text-slate-300">✂ CUT HERE</span>
                         </div>
                       </div>
                     ))}

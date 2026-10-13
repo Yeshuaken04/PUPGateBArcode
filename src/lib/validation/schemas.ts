@@ -82,7 +82,7 @@ export const StudentFormSchema = z.object({
       return isNaN(num) ? null : num;
     })
     .refine((num) => num === null || (num >= 1 && num <= 4), {
-      message: 'Year level must be between 1 and 4 (Hanggang 4th year lamang. Negative values or "-1" are strictly prohibited).',
+      message: 'Year level must be between 1 and 4 (Up to 4th year only. Negative values or "-1" are strictly prohibited).',
     }),
 
   section: z.string().trim().max(10).optional().nullable(),
@@ -94,7 +94,7 @@ export const StudentFormSchema = z.object({
     .nullable()
     .transform((val) => (val === '' ? null : val))
     .refine((val) => !val || (val !== '-1' && PHONE_REGEX.test(val)), {
-      message: 'Contact number must be an 11-digit Philippine mobile number starting with 09 (e.g. 09171234567). Bawal ang "-1".',
+      message: 'Contact number must be an 11-digit Philippine mobile number starting with 09 (e.g. 09171234567). "-1" is strictly prohibited.',
     }),
 
   rfid_uid: z

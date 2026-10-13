@@ -7,8 +7,7 @@ import { createClient } from '@/lib/supabase/client';
 
 const DEMO_ACCOUNTS = [
   { username: 'admin', password: 'PUPBataan@123', full_name: 'System Administrator', role: 'admin', email: 'admin@pup.edu.ph' },
-  { username: 'guard', password: 'guard123', full_name: 'PUP Gate Guard', role: 'guard', email: 'guard@pup.edu.ph' },
-  { username: 'operator', password: 'operator123', full_name: 'Security Operator', role: 'admin', email: 'operator@pup.edu.ph' },
+  { username: 'guard', password: 'guard123', full_name: 'PUP Campus Security Guard', role: 'guard', email: 'guard@pup.edu.ph' },
 ];
 
 export default function LoginPage() {

@@ -69,14 +69,14 @@ function AccessLogsContent() {
   };
 
   const handleDeleteLog = async (id: string) => {
-    if (!confirm('Sigurado ka bang nais mong burahin ang log na ito mula sa database?')) return;
+    if (!confirm('Are you sure you want to delete this log from the database?')) return;
     try {
       const res = await fetch(`/api/logs?id=${encodeURIComponent(id)}`, { method: 'DELETE' });
       const json = await res.json();
-      if (!res.ok) throw new Error(json.error || 'Hindi nabura ang log.');
+      if (!res.ok) throw new Error(json.error || 'Failed to delete log.');
       loadLogs();
     } catch (err: any) {
-      alert(err?.message || 'Error sa pagbura ng log');
+      alert(err?.message || 'Error while deleting log');
     }
   };
 
@@ -448,7 +448,7 @@ function AccessLogsContent() {
                   <th className="px-3.5 py-3">Gate</th>
                   <th className="px-3.5 py-3">Credential</th>
                   <th className="px-3.5 py-3">Result</th>
-                  <th className="px-3.5 py-3 text-right">Aksyon</th>
+                  <th className="px-3.5 py-3 text-right">Action</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 bg-white">
@@ -542,7 +542,7 @@ function AccessLogsContent() {
                         <td className="whitespace-nowrap px-3.5 py-3 text-right">
                           <button
                             onClick={() => handleDeleteLog(log.id)}
-                            title="Burahin ang Log"
+                            title="Delete Log"
                             className="rounded-lg p-1.5 text-slate-400 hover:bg-rose-50 hover:text-rose-600 transition"
                           >
                             <Trash2 className="h-4 w-4" />

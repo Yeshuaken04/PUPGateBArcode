@@ -179,7 +179,7 @@ Estimated Present on Campus: ${stats.insideCount}`;
             <h3 className="text-sm font-bold text-slate-900">Gate Pass Distribution by Hour</h3>
             {stats.totalScans === 0 && (
               <span className="text-xs font-semibold text-slate-400">
-                (Walang scan logs sa database sa panahong ito)
+                (No scan logs in database for this period)
               </span>
             )}
           </div>

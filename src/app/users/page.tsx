@@ -55,7 +55,7 @@ export default function UsersPage() {
   return (
     <DashboardLayout
       title="System Users & Role-Based Access Control (RBAC)"
-      subtitle="Pamamahala ng mga awtorisadong Administrator at Gate Security Guards"
+      subtitle="Manage authorized Administrators and Gate Security Guards"
     >
       <div className="space-y-4 max-w-4xl">
         {/* Strictly 2 Roles Permission Summary */}
@@ -66,7 +66,7 @@ export default function UsersPage() {
               <span className="font-black text-sm text-pup-900">Administrator (Admin)</span>
             </div>
             <p className="text-slate-600 mt-2 leading-relaxed text-[12px]">
-              Buong kontrol sa system: Student Directory, Excel Bulk Upload, Vehicle Registry, Barcode ID Passes, Gate Barrier Controls, Audit Logs & Analytics, at Settings.
+              Full system control: Student Directory, Excel Bulk Upload, Vehicle Registry, Barcode ID Passes, Gate Barrier Controls, Audit Logs & Analytics, and Settings.
             </p>
           </div>
 
@@ -76,7 +76,7 @@ export default function UsersPage() {
               <span className="font-black text-sm text-emerald-900">Security Guard (Guard)</span>
             </div>
             <p className="text-slate-600 mt-2 leading-relaxed text-[12px]">
-              Gate access operation: Live Camera Barcode / QR Scanner, Barrier Manual Trigger, Verification ng mga pumapasok/lumalabas, at pag-issue ng Temporary Visitor Pass.
+              Gate access operation: Live Camera Barcode / QR Scanner, Barrier Manual Trigger, verification of entrants/departures, and temporary visitor pass issuance.
             </p>
           </div>
         </div>
@@ -86,8 +86,8 @@ export default function UsersPage() {
           <table className="w-full text-left text-sm">
             <thead className="bg-slate-50 text-[11px] uppercase tracking-wider text-slate-500 border-b border-slate-100">
               <tr>
-                <th className="px-4 py-3">Pangalan (Full Name)</th>
-                <th className="px-4 py-3">Tungkulin (Role)</th>
+                <th className="px-4 py-3">Full Name</th>
+                <th className="px-4 py-3">Role</th>
                 <th className="px-4 py-3">Access Scope</th>
                 <th className="px-4 py-3">Status</th>
               </tr>

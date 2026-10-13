@@ -8,7 +8,7 @@ export async function POST(request: NextRequest) {
 
     if (!Array.isArray(students) || students.length === 0) {
       return NextResponse.json(
-        { error: 'Walang valid na student records na natanggap.' },
+        { error: 'No valid student records received.' },
         { status: 400 }
       );
     }
@@ -80,7 +80,7 @@ export async function POST(request: NextRequest) {
   } catch (err: any) {
     console.error('[BULK_UPLOAD_SERVER_ERROR]', err);
     return NextResponse.json(
-      { error: err?.message || 'Server error sa bulk upload.' },
+      { error: err?.message || 'Server error during bulk upload.' },
       { status: 500 }
     );
   }

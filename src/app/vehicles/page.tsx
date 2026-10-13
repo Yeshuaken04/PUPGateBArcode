@@ -137,16 +137,16 @@ export default function VehiclesPage() {
   };
 
   const handleDeleteVehicle = async (v: Vehicle) => {
-    if (!confirm(`Sigurado ka bang nais mong burahin ang sasakyan na may plakang "${v.plate_number}"?`)) return;
+    if (!confirm(`Are you sure you want to delete the vehicle with plate "${v.plate_number}"?`)) return;
     try {
       const res = await fetch(`/api/vehicles?id=${encodeURIComponent(v.id)}`, {
         method: 'DELETE',
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Hindi nabura ang sasakyan.');
+      if (!res.ok) throw new Error(data.error || 'Failed to delete vehicle.');
       loadData();
     } catch (err: any) {
-      alert(err?.message || 'Error sa pagbura ng sasakyan.');
+      alert(err?.message || 'Error while deleting vehicle.');
     }
   };
 
@@ -158,9 +158,9 @@ export default function VehiclesPage() {
     if (!selectedStudent) {
       setFormErrors((prev) => ({
         ...prev,
-        student_id: 'Kailangan pumili ng rehistradong Student o Faculty sa database.',
+        student_id: 'Please select a registered Student or Faculty member from the database.',
       }));
-      setSubmitError('Pumili muna ng may-ari ng sasakyan mula sa database.');
+      setSubmitError('Please select a vehicle owner from the database.');
       return;
     }
 
@@ -182,7 +182,7 @@ export default function VehiclesPage() {
         }
       });
       setFormErrors(fieldErrors);
-      setSubmitError('Pakitama ang mga may pulang marka bago mag-save.');
+      setSubmitError('Please correct highlighted fields before saving.');
       return;
     }
 
@@ -204,20 +204,20 @@ export default function VehiclesPage() {
 
       const resData = await res.json();
       if (!res.ok) {
-        throw new Error(resData.error || 'Hindi na-save ang sasakyan. Pakisuri kung may kaparehong plate number na.');
+        throw new Error(resData.error || 'Failed to save vehicle. Please check if this plate number is already registered.');
       }
 
       setModalOpen(false);
       loadData();
     } catch (err: any) {
-      setSubmitError(err?.message || 'Hindi na-save ang sasakyan. Pakisuri kung may kaparehong plate number na.');
+      setSubmitError(err?.message || 'Failed to save vehicle. Please check if this plate number is already registered.');
     }
   };
 
   return (
     <DashboardLayout
       title="Campus Vehicle Pass & RFID Registry"
-      subtitle="Rehistradong mga motorsiklo at kotse ng students at faculty para sa awtomatikong gate barrier access"
+      subtitle="Registered motorcycles and vehicles for students and faculty with automated barrier access"
     >
       <div className="space-y-4">
         {/* Top Controls */}
@@ -228,7 +228,7 @@ export default function VehiclesPage() {
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Mag-search gamit ang plate number (e.g., ABC-1234) o may-ari..."
+              placeholder="Search by license plate (e.g. ABC-1234) or owner name..."
               className="w-full rounded-xl border border-slate-300 py-2.5 pl-10 pr-4 text-sm outline-none focus:border-pup-700"
             />
           </div>
@@ -246,7 +246,7 @@ export default function VehiclesPage() {
               className="flex items-center gap-1.5 rounded-xl bg-pup-700 px-4 py-2.5 text-xs font-bold text-white shadow-sm hover:bg-pup-800 transition"
             >
               <Plus className="h-4 w-4" />
-              <span>Mag-register ng Sasakyan</span>
+              <span>Register Vehicle</span>
             </button>
           </div>
         </div>
@@ -258,14 +258,14 @@ export default function VehiclesPage() {
               <thead className="bg-slate-50 text-[11px] uppercase tracking-wider text-slate-500 border-b border-slate-100">
                 <tr>
                   <th className="px-4 py-3">License Plate</th>
-                  <th className="px-4 py-3">May-ari (Owner)</th>
+                  <th className="px-4 py-3">Owner</th>
                   <th className="px-4 py-3">Classification</th>
                   <th className="px-4 py-3">ID Number</th>
                   <th className="px-4 py-3">Brand & Model</th>
-                  <th className="px-4 py-3">Uri ng Sasakyan</th>
-                  <th className="px-4 py-3">Kulay</th>
+                  <th className="px-4 py-3">Vehicle Type</th>
+                  <th className="px-4 py-3">Color</th>
                   <th className="px-4 py-3">Barrier Pass Status</th>
-                  <th className="px-4 py-3 text-right">Aksyon</th>
+                  <th className="px-4 py-3 text-right">Action</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -278,7 +278,7 @@ export default function VehiclesPage() {
                         </span>
                       </td>
                       <td className="px-4 py-3 font-bold text-slate-900">
-                        {v.student ? `${v.student.first_name} ${v.student.last_name}` : 'Hindi Natukoy'}
+                        {v.student ? `${v.student.first_name} ${v.student.last_name}` : 'Unknown Owner'}
                       </td>
                       <td className="px-4 py-3">
                         <span
@@ -308,14 +308,14 @@ export default function VehiclesPage() {
                         <div className="flex items-center justify-end gap-1">
                           <button
                             onClick={() => handleEditVehicle(v)}
-                            title="I-edit ang Sasakyan"
+                            title="Edit Vehicle"
                             className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100 hover:text-pup-700 transition"
                           >
                             <Edit className="h-4 w-4" />
                           </button>
                           <button
                             onClick={() => handleDeleteVehicle(v)}
-                            title="Burahin ang Sasakyan"
+                            title="Delete Vehicle"
                             className="rounded-lg p-1.5 text-slate-400 hover:bg-rose-50 hover:text-rose-600 transition"
                           >
                             <Trash2 className="h-4 w-4" />
@@ -327,7 +327,7 @@ export default function VehiclesPage() {
                 ) : (
                   <tr>
                     <td colSpan={9} className="py-10 text-center text-xs text-slate-400">
-                      Walang rehistradong sasakyan na tumutugma sa search.
+                      No registered vehicles match your search.
                     </td>
                   </tr>
                 )}
@@ -344,10 +344,10 @@ export default function VehiclesPage() {
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <div>
                 <h3 className="text-base font-black text-slate-900">
-                  {form.id ? 'I-edit ang Vehicle Pass' : 'Mag-register ng Vehicle Pass'}
+                  {form.id ? 'Edit Vehicle Pass' : 'Register Vehicle Pass'}
                 </h3>
                 <p className="text-xs text-slate-500">
-                  Dapat may-ari ay verified student o faculty na nasa database.
+                  Owner must be a verified student or faculty member in the database.
                 </p>
               </div>
               <button
@@ -369,7 +369,7 @@ export default function VehiclesPage() {
               {/* Step 1: Student / Faculty Verification Picker */}
               <div>
                 <label className="block text-xs font-bold uppercase text-slate-600 mb-1">
-                  1. May-ari ng Sasakyan (Verified sa Database) *
+                  1. Vehicle Owner (Verified in Database) *
                 </label>
                 {selectedStudent ? (
                   <div className="flex items-center justify-between rounded-xl border border-emerald-300 bg-emerald-50/70 p-3">
@@ -394,7 +394,7 @@ export default function VehiclesPage() {
                       }}
                       className="text-xs font-bold text-slate-500 hover:text-rose-600"
                     >
-                      Palitan
+                      Change
                     </button>
                   </div>
                 ) : (
@@ -403,7 +403,7 @@ export default function VehiclesPage() {
                       type="text"
                       value={studentSearchQuery}
                       onChange={(e) => setStudentSearchQuery(e.target.value)}
-                      placeholder="I-type ang pangalan o student number para hanapin sa listahan..."
+                      placeholder="Type name or ID number to search registered owners..."
                       className="w-full rounded-xl border border-slate-300 px-3 py-2 text-xs outline-none focus:border-pup-700"
                     />
                     <div className="max-h-36 overflow-y-auto rounded-xl border border-slate-200 bg-slate-50/50 p-1 divide-y divide-slate-100">
@@ -436,7 +436,7 @@ export default function VehiclesPage() {
                         ))
                       ) : (
                         <div className="p-3 text-center text-xs text-slate-400">
-                          Walang natagpuang active student/faculty sa database.
+                          No active students or faculty found in database.
                         </div>
                       )}
                     </div>
@@ -463,7 +463,7 @@ export default function VehiclesPage() {
                     if (val === '-1' || val.startsWith('-')) {
                       setFormErrors((prev) => ({
                         ...prev,
-                        plate_number: 'Bawal ang negative number o "-1" sa plate number.',
+                        plate_number: 'Negative values or "-1" are not allowed.',
                       }));
                     } else {
                       setFormErrors((prev) => {
@@ -473,7 +473,7 @@ export default function VehiclesPage() {
                       });
                     }
                   }}
-                  placeholder="Hal. ABC-1234 o ABC-123"
+                  placeholder="e.g. ABC-1234 or ABC-123"
                   className={`w-full rounded-xl border px-3 py-2 text-sm font-mono font-black uppercase outline-none ${
                     formErrors.plate_number
                       ? 'border-rose-500 bg-rose-50/30'
@@ -501,7 +501,7 @@ export default function VehiclesPage() {
                     if (val === '-1') {
                       setFormErrors((prev) => ({
                         ...prev,
-                        brand_model: 'Bawal ang "-1" sa brand o model.',
+                        brand_model: 'Negative values or "-1" are not allowed.',
                       }));
                     } else {
                       setFormErrors((prev) => {
@@ -511,7 +511,7 @@ export default function VehiclesPage() {
                       });
                     }
                   }}
-                  placeholder="Hal. Yamaha Aerox 155, Honda Click, Toyota Vios"
+                  placeholder="e.g. Yamaha Aerox 155, Honda Click, Toyota Vios"
                   className={`w-full rounded-xl border px-3 py-2 text-sm outline-none ${
                     formErrors.brand_model
                       ? 'border-rose-500 bg-rose-50/30'
@@ -529,23 +529,23 @@ export default function VehiclesPage() {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-bold uppercase text-slate-600 mb-1">
-                    Uri ng Sasakyan
+                    Vehicle Type
                   </label>
                   <select
                     value={form.vehicle_type}
                     onChange={(e) => setForm({ ...form, vehicle_type: e.target.value as any })}
                     className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm outline-none focus:border-pup-700"
                   >
-                    <option value="motorcycle">Motorsiklo (Motorcycle)</option>
-                    <option value="car">Kotse (Car)</option>
+                    <option value="motorcycle">Motorcycle</option>
+                    <option value="car">Car</option>
                     <option value="van">Van</option>
-                    <option value="bicycle">Bisikleta (Bicycle)</option>
-                    <option value="other">Iba pa</option>
+                    <option value="bicycle">Bicycle</option>
+                    <option value="other">Other</option>
                   </select>
                 </div>
                 <div>
                   <label className="block text-xs font-bold uppercase text-slate-600 mb-1">
-                    Kulay
+                    Color
                   </label>
                   <input
                     value={form.color}
@@ -555,7 +555,7 @@ export default function VehiclesPage() {
                       if (val === '-1') {
                         setFormErrors((prev) => ({
                           ...prev,
-                          color: 'Bawal ang "-1" sa kulay.',
+                          color: 'Negative values or "-1" are not allowed.',
                         }));
                       } else {
                         setFormErrors((prev) => {
@@ -586,13 +586,13 @@ export default function VehiclesPage() {
                   onClick={() => setModalOpen(false)}
                   className="flex-1 rounded-xl border border-slate-300 py-2.5 text-xs font-bold text-slate-700 hover:bg-slate-50 transition"
                 >
-                  Kanselahin
+                  Cancel
                 </button>
                 <button
                   type="submit"
                   className="flex-1 rounded-xl bg-pup-700 py-2.5 text-xs font-bold text-white hover:bg-pup-800 transition shadow-sm"
                 >
-                  I-save ang Vehicle Pass
+                  Save Vehicle Pass
                 </button>
               </div>
             </form>

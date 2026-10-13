@@ -60,7 +60,7 @@ export default function BarcodeRenderer({
   if (!value) {
     return (
       <div className="flex h-24 items-center justify-center rounded-xl bg-slate-100 text-xs text-slate-400">
-        Walang barcode value na itinalaga.
+        No barcode value assigned.
       </div>
     );
   }

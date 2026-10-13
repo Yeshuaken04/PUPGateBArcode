@@ -178,7 +178,7 @@ export default function StudentsPage() {
 
   const handleEdit = (s: Student) => {
     if (currentUserRole === 'guard' && s.person_type !== 'visitor') {
-      alert('Bilang Gate Guard, ang mga Visitor Pass records lamang ang may pahintulot kang baguhin.');
+      alert('As Gate Guard, you are only authorized to modify Visitor Pass records.');
       return;
     }
     setForm({
@@ -233,7 +233,7 @@ export default function StudentsPage() {
         }
       });
       setFormErrors(fieldErrors);
-      setSubmitError('Pakitama ang mga may pulang marka bago magpatuloy.');
+      setSubmitError('Please correct highlighted fields before submitting.');
       return;
     }
 
@@ -265,34 +265,34 @@ export default function StudentsPage() {
 
       const resData = await res.json();
       if (!res.ok) {
-        throw new Error(resData.error || 'Hindi na-save sa database. Pakisubukang muli.');
+        throw new Error(resData.error || 'Failed to save record to database. Please try again.');
       }
 
       setModalOpen(false);
       loadStudents();
     } catch (err: any) {
-      setSubmitError(err?.message || 'Hindi na-save sa database. Pakisubukang muli.');
+      setSubmitError(err?.message || 'Failed to save record to database. Please try again.');
     }
   };
 
   const handleDeleteStudent = async (studentId: string, studentName: string) => {
-    if (!confirm(`Sigurado ka bang nais mong burahin ang record ni ${studentName}?`)) return;
+    if (!confirm(`Are you sure you want to delete the record for ${studentName}?`)) return;
     try {
       const res = await fetch(`/api/students?id=${encodeURIComponent(studentId)}`, {
         method: 'DELETE',
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Hindi nabura ang record.');
+      if (!res.ok) throw new Error(data.error || 'Failed to delete record.');
       loadStudents();
     } catch (err: any) {
-      alert(err?.message || 'Error sa pagbura ng record.');
+      alert(err?.message || 'Error while deleting record.');
     }
   };
 
   return (
     <DashboardLayout
       title={currentUserRole === 'guard' ? 'Visitor Pass Directory & Temporary Campus Access' : 'Student & Personnel Verification Directory'}
-      subtitle={currentUserRole === 'guard' ? 'Pamamahala ng mga visitor at guest gate passes para sa gate security' : 'Masterlist ng mga enrolled students, faculty, staff, at visitors na awtorisadong pumasok sa gate'}
+      subtitle={currentUserRole === 'guard' ? 'Manage visitor and guest gate passes for campus security' : 'Masterlist of enrolled students, faculty, staff, and visitors authorized for campus entry'}
     >
       <div className="space-y-4">
         {/* Controls & Quick Actions */}
@@ -304,7 +304,7 @@ export default function StudentsPage() {
                 type="text"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                placeholder={currentUserRole === 'guard' ? 'Mag-search gamit ang Pass ID, pangalan, o opisina...' : 'Mag-search gamit ang ID, pangalan, kurso, o RFID...'}
+                placeholder={currentUserRole === 'guard' ? 'Search by Pass ID, name, or office...' : 'Search by ID, name, course, or RFID...'}
                 className="w-full rounded-xl border border-slate-300 py-2.5 pl-10 pr-4 text-sm outline-none focus:border-pup-700 focus:ring-1 focus:ring-pup-700"
               />
             </div>
@@ -315,11 +315,11 @@ export default function StudentsPage() {
               onChange={(e) => setTypeFilter(e.target.value)}
               className="rounded-xl border border-slate-300 px-3 py-2.5 text-xs font-semibold text-slate-700 outline-none hover:bg-slate-50"
             >
-              <option value="all">Lahat ng Role</option>
-              <option value="student">Students Lamang</option>
-              <option value="faculty">Faculty / Guro Lamang</option>
-              <option value="staff">Staff / Kawani Lamang</option>
-              <option value="visitor">Visitors Lamang</option>
+              <option value="all">All Roles</option>
+              <option value="student">Students Only</option>
+              <option value="faculty">Faculty Only</option>
+              <option value="staff">Staff Only</option>
+              <option value="visitor">Visitors Only</option>
             </select>
 
             {/* Filter by Status */}
@@ -328,7 +328,7 @@ export default function StudentsPage() {
               onChange={(e) => setStatusFilter(e.target.value)}
               className="rounded-xl border border-slate-300 px-3 py-2.5 text-xs font-semibold text-slate-700 outline-none hover:bg-slate-50"
             >
-              <option value="all">Lahat ng Status</option>
+              <option value="all">All Statuses</option>
               <option value="active">Active Only</option>
               <option value="suspended">Suspended Only</option>
               <option value="inactive">Inactive Only</option>
@@ -361,7 +361,7 @@ export default function StudentsPage() {
               className="flex items-center gap-1.5 rounded-xl bg-pup-700 px-4 py-2.5 text-xs font-bold text-white shadow-sm hover:bg-pup-800 transition"
             >
               <Plus className="h-4 w-4" />
-              <span>{currentUserRole === 'guard' ? 'Mag-issue ng Visitor Pass' : 'Mag-rehistro'}</span>
+              <span>{currentUserRole === 'guard' ? 'Issue Visitor Pass' : 'Register Person'}</span>
             </button>
           </div>
         </div>
@@ -423,7 +423,7 @@ export default function StudentsPage() {
                             {s.rfid_uid}
                           </span>
                         ) : (
-                          <span className="text-slate-400 italic">Walang Card</span>
+                          <span className="text-slate-400 italic">No Card</span>
                         )}
                       </td>
                       <td className="whitespace-nowrap px-4 py-3 font-mono text-xs text-slate-700">
@@ -432,7 +432,7 @@ export default function StudentsPage() {
                             {s.qr_code}
                           </span>
                         ) : (
-                          <span className="text-slate-400 italic">Walang QR</span>
+                          <span className="text-slate-400 italic">No QR</span>
                         )}
                       </td>
                       <td className="whitespace-nowrap px-4 py-3">
@@ -465,7 +465,7 @@ export default function StudentsPage() {
                             <>
                               <button
                                 onClick={() => handleEdit(s)}
-                                title={currentUserRole === 'guard' ? 'I-edit ang Visitor Pass' : 'I-edit'}
+                                title={currentUserRole === 'guard' ? 'Edit Visitor Pass' : 'Edit'}
                                 className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100 hover:text-pup-700"
                               >
                                 <Edit className="h-4 w-4" />
@@ -473,7 +473,7 @@ export default function StudentsPage() {
                               {(currentUserRole === 'admin' || currentUserRole === 'super_admin') && (
                                 <button
                                   onClick={() => handleDeleteStudent(s.id, `${s.first_name} ${s.last_name}`)}
-                                  title="Burahin ang Record"
+                                  title="Delete Record"
                                   className="rounded-lg p-1.5 text-slate-400 hover:bg-rose-50 hover:text-rose-600 transition"
                                 >
                                   <Trash2 className="h-4 w-4" />
@@ -488,7 +488,7 @@ export default function StudentsPage() {
                 ) : (
                   <tr>
                     <td colSpan={8} className="py-12 text-center text-xs text-slate-400">
-                      Walang natagpuang records sa inyong criteria.
+                      No records found matching your criteria.
                     </td>
                   </tr>
                 )}
@@ -506,13 +506,13 @@ export default function StudentsPage() {
               <div>
                 <h3 className="text-base font-black text-slate-900">
                   {currentUserRole === 'guard'
-                    ? form.id ? 'I-edit ang Visitor Pass' : 'Mag-issue ng Bagong Visitor Pass'
-                    : form.id ? 'I-edit ang Record' : 'Mag-register ng Student / Personnel'}
+                    ? form.id ? 'Edit Visitor Pass' : 'Issue New Visitor Pass'
+                    : form.id ? 'Edit Record' : 'Register Student / Personnel'}
                 </h3>
                 <p className="text-xs text-slate-500">
                   {currentUserRole === 'guard'
-                    ? 'Mag-isyu ng temporary visitor barcode pass para sa bisita ng campus.'
-                    : 'Mahigpit ang pag-verify: Letra lang sa pangalan, numero lang sa numeric fields, bawal ang "-1".'}
+                    ? 'Issue temporary visitor barcode pass for campus guests.'
+                    : 'Strict validation: Letters only for names, numbers only for numeric fields, negative values not allowed.'}
                 </p>
               </div>
               <button
@@ -544,8 +544,8 @@ export default function StudentsPage() {
                     onChange={(e) => setForm({ ...form, person_type: e.target.value as PersonType })}
                     className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm font-semibold outline-none focus:border-pup-700 disabled:bg-slate-100 disabled:text-slate-500"
                   >
-                    <option value="student">Student (Mag-aaral)</option>
-                    <option value="faculty">Faculty / Teacher (Guro)</option>
+                    <option value="student">Student</option>
+                    <option value="faculty">Faculty / Teacher</option>
                     <option value="staff">Staff / Admin Personnel</option>
                     <option value="visitor">Visitor / Guest</option>
                   </select>
@@ -564,7 +564,7 @@ export default function StudentsPage() {
                       if (val === '-1' || val.startsWith('-')) {
                         setFormErrors((prev) => ({
                           ...prev,
-                          student_number: 'Bawal ang negative number o "-1".',
+                          student_number: 'Negative numbers or "-1" are not allowed.',
                         }));
                       } else {
                         setFormErrors((prev) => {
@@ -574,7 +574,7 @@ export default function StudentsPage() {
                         });
                       }
                     }}
-                    placeholder="Hal. 2021-12345 o FAC-2024-001"
+                    placeholder="e.g. 2021-12345 or FAC-2024-001"
                     className={`w-full rounded-xl border px-3 py-2 text-sm font-mono font-bold outline-none ${
                       formErrors.student_number
                         ? 'border-rose-500 bg-rose-50/30'
@@ -604,7 +604,7 @@ export default function StudentsPage() {
                       if (/\d/.test(val) || val.includes('-1')) {
                         setFormErrors((prev) => ({
                           ...prev,
-                          first_name: 'Bawal ang numero o "-1". Mga letra lamang ang pwede.',
+                          first_name: 'Numbers or "-1" are not allowed. Letters only.',
                         }));
                       } else {
                         setFormErrors((prev) => {
@@ -640,7 +640,7 @@ export default function StudentsPage() {
                       if (/\d/.test(val) || val.includes('-1')) {
                         setFormErrors((prev) => ({
                           ...prev,
-                          middle_name: 'Bawal ang numero o "-1".',
+                          middle_name: 'Numbers or "-1" are not allowed.',
                         }));
                       } else {
                         setFormErrors((prev) => {
@@ -677,7 +677,7 @@ export default function StudentsPage() {
                       if (/\d/.test(val) || val.includes('-1')) {
                         setFormErrors((prev) => ({
                           ...prev,
-                          last_name: 'Bawal ang numero o "-1". Letra lamang.',
+                          last_name: 'Numbers or "-1" are not allowed. Letters only.',
                         }));
                       } else {
                         setFormErrors((prev) => {
@@ -746,12 +746,12 @@ export default function StudentsPage() {
                       if (val === '-1' || Number(val) < 0) {
                         setFormErrors((prev) => ({
                           ...prev,
-                          year_level: 'Bawal ang "-1" o negative na taon.',
+                          year_level: 'Negative year level is not allowed.',
                         }));
                       } else if (Number(val) > 4) {
                         setFormErrors((prev) => ({
                           ...prev,
-                          year_level: 'Hanggang 4th year lamang (1 hanggang 4).',
+                          year_level: 'Valid year level is 1 to 4.',
                         }));
                       } else {
                         setFormErrors((prev) => {
@@ -799,7 +799,7 @@ export default function StudentsPage() {
                       if (val === '-1' || val.includes('-1')) {
                         setFormErrors((prev) => ({
                           ...prev,
-                          contact_number: 'Bawal ang "-1" sa contact number.',
+                          contact_number: 'Negative contact number is not allowed.',
                         }));
                       } else {
                         setFormErrors((prev) => {
@@ -838,7 +838,7 @@ export default function StudentsPage() {
                       if (val === '-1') {
                         setFormErrors((prev) => ({
                           ...prev,
-                          rfid_uid: 'Bawal ang "-1" sa RFID UID.',
+                          rfid_uid: 'Invalid RFID UID value.',
                         }));
                       } else {
                         setFormErrors((prev) => {
@@ -867,8 +867,8 @@ export default function StudentsPage() {
                     onChange={(e) => setForm({ ...form, status: e.target.value as StudentStatus })}
                     className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm outline-none focus:border-pup-700"
                   >
-                    <option value="active">Active (May pahintulot pumasok)</option>
-                    <option value="suspended">Suspended (Blocked sa gate)</option>
+                    <option value="active">Active (Authorized)</option>
+                    <option value="suspended">Suspended (Blocked)</option>
                     <option value="inactive">Inactive</option>
                     <option value="graduated">Graduated / Alumni</option>
                   </select>
@@ -881,13 +881,13 @@ export default function StudentsPage() {
                   onClick={() => setModalOpen(false)}
                   className="flex-1 rounded-xl border border-slate-300 py-2.5 text-xs font-bold text-slate-700 hover:bg-slate-50 transition"
                 >
-                  Kanselahin
+                  Cancel
                 </button>
                 <button
                   type="submit"
                   className="flex-1 rounded-xl bg-pup-700 py-2.5 text-xs font-bold text-white hover:bg-pup-800 transition shadow-sm"
                 >
-                  {form.id ? 'I-update ang Record' : 'I-save ang Record sa Database'}
+                  {form.id ? 'Update Record' : 'Save Record'}
                 </button>
               </div>
             </form>

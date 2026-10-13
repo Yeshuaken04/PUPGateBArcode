@@ -54,41 +54,43 @@ export default function DashboardPage() {
   // Real Counts from Database (strictly starts at 0, no fake data)
   const [verifiedStudentCount, setVerifiedStudentCount] = useState<number>(0);
   const [facultyCount, setFacultyCount] = useState<number>(0);
+  const [vehicleCount, setVehicleCount] = useState<number>(0);
   const [entriesTodayCount, setEntriesTodayCount] = useState<number>(0);
   const [exitsTodayCount, setExitsTodayCount] = useState<number>(0);
   const [deniedTodayCount, setDeniedTodayCount] = useState<number>(0);
+  const [lastSyncedAt, setLastSyncedAt] = useState<string>('');
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const handleDeleteLog = async (id: string) => {
-    if (!confirm('Sigurado ka bang nais mong burahin ang scan log na ito mula sa dashboard at database?')) return;
+    if (!confirm('Are you sure you want to delete this scan log from the dashboard and database?')) return;
     setDeletingId(id);
     try {
       const res = await fetch(`/api/logs?id=${encodeURIComponent(id)}`, { method: 'DELETE' });
       const json = await res.json();
-      if (!res.ok) throw new Error(json.error || 'Hindi nabura ang log.');
+      if (!res.ok) throw new Error(json.error || 'Failed to delete log.');
       setLogs((prev) => prev.filter((l) => l.id !== id));
       fetchDashboardData();
     } catch (err: any) {
-      alert(err?.message || 'Error habang binubura ang log');
+      alert(err?.message || 'Error while deleting log');
     } finally {
       setDeletingId(null);
     }
   };
 
   const handleClearAllLogs = async () => {
-    if (!confirm('Sigurado ka bang nais mong burahin ang LAHAT ng kasalukuyang gate logs sa dashboard at database?')) return;
+    if (!confirm('Are you sure you want to delete ALL current gate logs from the dashboard and database?')) return;
     setLoading(true);
     try {
       const res = await fetch('/api/logs?all=true', { method: 'DELETE' });
       const json = await res.json();
-      if (!res.ok) throw new Error(json.error || 'Hindi nabura ang mga log.');
+      if (!res.ok) throw new Error(json.error || 'Failed to delete logs.');
       setLogs([]);
       setEntriesTodayCount(0);
       setExitsTodayCount(0);
       setDeniedTodayCount(0);
       fetchDashboardData();
     } catch (err: any) {
-      alert(err?.message || 'Error');
+      alert(err?.message || 'Error deleting logs');
     } finally {
       setLoading(false);
     }
@@ -98,8 +100,14 @@ export default function DashboardPage() {
     setLoading(true);
     try {
       const [logsRes, statsRes] = await Promise.all([
-        fetch('/api/logs?limit=30'),
-        fetch('/api/stats'),
+        fetch('/api/logs?limit=30', {
+          cache: 'no-store',
+          headers: { 'Cache-Control': 'no-cache, no-store' },
+        }),
+        fetch('/api/stats', {
+          cache: 'no-store',
+          headers: { 'Cache-Control': 'no-cache, no-store' },
+        }),
       ]);
       const [logsJson, statsJson] = await Promise.all([
         logsRes.json(),
@@ -116,11 +124,20 @@ export default function DashboardPage() {
         const s = statsJson.data;
         setVerifiedStudentCount(s.studentCount || 0);
         setFacultyCount(s.facultyCount || 0);
+        setVehicleCount(s.vehicleCount || 0);
         setInsideCount(s.insideCount || 0);
         setEntriesTodayCount(s.entriesToday || 0);
         setExitsTodayCount(s.exitsToday || 0);
         setDeniedTodayCount(s.deniedToday || 0);
       }
+
+      setLastSyncedAt(
+        new Date().toLocaleTimeString('en-US', {
+          hour: '2-digit',
+          minute: '2-digit',
+          second: '2-digit',
+        })
+      );
 
       // Check user role from supabase auth if available
       try {
@@ -146,6 +163,7 @@ export default function DashboardPage() {
       setInsideCount(0);
       setVerifiedStudentCount(0);
       setFacultyCount(0);
+      setVehicleCount(0);
       setEntriesTodayCount(0);
       setExitsTodayCount(0);
       setDeniedTodayCount(0);
@@ -157,26 +175,45 @@ export default function DashboardPage() {
   useEffect(() => {
     fetchDashboardData();
 
-    // Supabase Realtime Listener for Live Scans
+    // Auto-sync polling every 3 seconds for 100% live database accuracy
+    const pollInterval = setInterval(() => {
+      fetchDashboardData();
+    }, 3000);
+
+    // Supabase Realtime Listener for Live Scans & Presence
+    let channel: any = null;
     try {
       const supabase = createClient();
-      const channel = supabase
+      channel = supabase
         .channel('realtime_gate_dashboard')
         .on(
           'postgres_changes',
-          { event: 'INSERT', schema: 'public', table: 'access_logs' },
+          { event: '*', schema: 'public', table: 'access_logs' },
+          () => {
+            fetchDashboardData();
+          }
+        )
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'student_presence' },
           () => {
             fetchDashboardData();
           }
         )
         .subscribe();
-
-      return () => {
-        supabase.removeChannel(channel);
-      };
     } catch {
       // ignore
     }
+
+    return () => {
+      clearInterval(pollInterval);
+      if (channel) {
+        try {
+          const supabase = createClient();
+          supabase.removeChannel(channel);
+        } catch {}
+      }
+    };
   }, []);
 
   const recentEntries = useMemo(
@@ -242,7 +279,7 @@ export default function DashboardPage() {
                   Faculty Student Verification & Attendance Center
                 </div>
                 <p className="text-xs text-slate-600">
-                  I-upload ang student verification masterlist (.xlsx/.csv) o suriin ang pumasok na mag-aaral ngayon.
+                  Upload the student verification masterlist (.xlsx/.csv) or review students who entered today.
                 </p>
               </div>
             </div>
@@ -264,9 +301,50 @@ export default function DashboardPage() {
           </div>
         )}
 
-        {/* Top Metric Cards - 100% REAL DATA, NO FAKE NUMBERS */}
+        {/* Live Sync Status Bar */}
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-emerald-200 bg-emerald-50/70 px-4 py-3 text-xs text-emerald-900 shadow-xs">
+          <div className="flex items-center gap-2.5">
+            <span className="relative flex h-3 w-3">
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75"></span>
+              <span className="relative inline-flex h-3 w-3 rounded-full bg-emerald-600"></span>
+            </span>
+            <div className="font-bold">
+              Live Database Connected
+              <span className="font-normal text-emerald-700 ml-1.5 hidden sm:inline">
+                • Real-time scan, add, or delete updates automatically (Auto-sync every 3s).
+              </span>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3">
+            {lastSyncedAt && (
+              <span className="text-[11px] font-mono text-emerald-700">
+                Updated: {lastSyncedAt}
+              </span>
+            )}
+            {deniedTodayCount > 0 && (
+              <Link
+                href="/access-logs"
+                className="flex items-center gap-1 rounded-lg bg-rose-100 px-2 py-0.5 text-[11px] font-bold text-rose-800 border border-rose-300"
+              >
+                <ShieldAlert className="h-3 w-3" />
+                <span>{deniedTodayCount} Denied Tap{deniedTodayCount > 1 ? 's' : ''}</span>
+              </Link>
+            )}
+            <button
+              onClick={fetchDashboardData}
+              disabled={loading}
+              className="flex items-center gap-1.5 rounded-lg border border-emerald-300 bg-white px-2.5 py-1 text-[11px] font-bold text-emerald-800 shadow-2xs hover:bg-emerald-100 transition cursor-pointer disabled:opacity-60"
+            >
+              <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} />
+              <span>Refresh Now</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Top Metric Cards - 100% REAL DATA DIRECTLY FROM DATABASE */}
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-2 lg:grid-cols-5">
-          {/* Card 1: Students Inside */}
+          {/* Card 1: Students / People Inside */}
           <div className="rounded-2xl border border-sky-100 bg-sky-50/60 p-4 shadow-sm">
             <div className="flex items-center justify-between">
               <span className="text-[11px] font-bold uppercase tracking-wider text-sky-800">
@@ -277,7 +355,7 @@ export default function DashboardPage() {
               </div>
             </div>
             <div className="mt-2 text-3xl font-black text-sky-950">{insideCount}</div>
-            <div className="text-[11px] font-medium text-sky-700">Kasalukuyang nasa loob ng PUP</div>
+            <div className="text-[11px] font-medium text-sky-700">Currently inside campus</div>
           </div>
 
           {/* Card 2: Today's Entries */}
@@ -314,69 +392,39 @@ export default function DashboardPage() {
             <div className="text-[11px] font-medium text-rose-700">Outbound departures today</div>
           </Link>
 
-          {/* Card 4: Active Gates / Verified Students (based on role) */}
-          {userRole === 'faculty' ? (
-            <Link
-              href="/students"
-              className="rounded-2xl border border-purple-100 bg-purple-50/60 p-4 shadow-sm transition hover:shadow-md"
-            >
-              <div className="flex items-center justify-between">
-                <span className="text-[11px] font-bold uppercase tracking-wider text-purple-800">
-                  Verified Students
-                </span>
-                <div className="rounded-xl bg-purple-100 p-2 text-purple-700">
-                  <UserCheck className="h-4 w-4" />
-                </div>
+          {/* Card 4: Verified Students (Masterlist in DB) */}
+          <Link
+            href="/students"
+            className="rounded-2xl border border-purple-100 bg-purple-50/60 p-4 shadow-sm transition hover:shadow-md"
+          >
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-purple-800">
+                Verified Students
+              </span>
+              <div className="rounded-xl bg-purple-100 p-2 text-purple-700">
+                <UserCheck className="h-4 w-4" />
               </div>
-              <div className="mt-2 text-3xl font-black text-purple-950">{verifiedStudentCount}</div>
-              <div className="text-[11px] font-medium text-purple-700">Nasa masterlist ng database</div>
-            </Link>
-          ) : (
-            <Link
-              href="/gates"
-              className="rounded-2xl border border-purple-100 bg-purple-50/60 p-4 shadow-sm transition hover:shadow-md"
-            >
-              <div className="flex items-center justify-between">
-                <span className="text-[11px] font-bold uppercase tracking-wider text-purple-800">
-                  Active Gates
-                </span>
-                <div className="rounded-xl bg-purple-100 p-2 text-purple-700">
-                  <SquareActivity className="h-4 w-4" />
-                </div>
-              </div>
-              <div className="mt-2 text-3xl font-black text-purple-950">2</div>
-              <div className="text-[11px] font-medium text-purple-700">Hardware controllers online</div>
-            </Link>
-          )}
+            </div>
+            <div className="mt-2 text-3xl font-black text-purple-950">{verifiedStudentCount}</div>
+            <div className="text-[11px] font-medium text-purple-700">Enrolled in campus masterlist</div>
+          </Link>
 
-          {/* Card 5: Unauthorized / Faculty Members */}
-          {userRole === 'faculty' ? (
-            <div className="col-span-2 sm:col-span-1 rounded-2xl border border-indigo-100 bg-indigo-50/60 p-4 shadow-sm">
-              <div className="flex items-center justify-between">
-                <span className="text-[11px] font-bold uppercase tracking-wider text-indigo-800">
-                  Faculty Roster
-                </span>
-                <div className="rounded-xl bg-indigo-100 p-2 text-indigo-700">
-                  <GraduationCap className="h-4 w-4" />
-                </div>
+          {/* Card 5: Registered Vehicles */}
+          <Link
+            href="/vehicles"
+            className="col-span-2 sm:col-span-1 rounded-2xl border border-amber-100 bg-amber-50/60 p-4 shadow-sm transition hover:shadow-md"
+          >
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-amber-800">
+                Registered Vehicles
+              </span>
+              <div className="rounded-xl bg-amber-100 p-2 text-amber-700">
+                <Car className="h-4 w-4" />
               </div>
-              <div className="mt-2 text-3xl font-black text-indigo-950">{facultyCount}</div>
-              <div className="text-[11px] font-medium text-indigo-700">Verified teachers & professors</div>
             </div>
-          ) : (
-            <div className="col-span-2 sm:col-span-1 rounded-2xl border border-amber-100 bg-amber-50/60 p-4 shadow-sm">
-              <div className="flex items-center justify-between">
-                <span className="text-[11px] font-bold uppercase tracking-wider text-amber-800">
-                  Unauthorized
-                </span>
-                <div className="rounded-xl bg-amber-100 p-2 text-amber-700">
-                  <ShieldAlert className="h-4 w-4" />
-                </div>
-              </div>
-              <div className="mt-2 text-3xl font-black text-amber-950">{deniedTodayCount}</div>
-              <div className="text-[11px] font-medium text-amber-700">Denied scans today</div>
-            </div>
-          )}
+            <div className="mt-2 text-3xl font-black text-amber-950">{vehicleCount}</div>
+            <div className="text-[11px] font-medium text-amber-700">Registered vehicles in database</div>
+          </Link>
         </div>
 
         {/* Middle Section: Traffic Trends & Status */}
@@ -471,13 +519,13 @@ export default function DashboardPage() {
                     Quick Masterlist Upload
                   </div>
                   <p className="text-[11px] text-blue-700">
-                    Maaari kang mag-upload ng Excel (.xlsx) file anumang oras upang ma-verify ang mga bagong estudyante.
+                    You can upload an Excel (.xlsx) file anytime to verify enrolled students.
                   </p>
                   <button
                     onClick={() => setBulkModalOpen(true)}
                     className="w-full rounded-lg bg-blue-700 py-2 text-center text-xs font-bold text-white hover:bg-blue-800 transition cursor-pointer"
                   >
-                    I-upload ang Excel File
+                    Upload Excel File
                   </button>
                 </div>
               </div>
@@ -618,7 +666,7 @@ export default function DashboardPage() {
                   <th className="px-4 py-3">Gate</th>
                   <th className="px-4 py-3">Result</th>
                   {(userRole === 'admin' || userRole === 'super_admin') && (
-                    <th className="px-4 py-3 text-right">Aksyon</th>
+                    <th className="px-4 py-3 text-right">Action</th>
                   )}
                 </tr>
               </thead>
@@ -690,7 +738,7 @@ export default function DashboardPage() {
                               onClick={() => handleDeleteLog(log.id)}
                               disabled={deletingId === log.id}
                               className="inline-flex items-center gap-1 rounded-lg border border-rose-200 bg-rose-50 px-2.5 py-1 text-[11px] font-bold text-rose-700 hover:bg-rose-100 hover:text-rose-800 transition disabled:opacity-50"
-                              title="Burahin ang scan record na ito"
+                              title="Delete this scan record"
                             >
                               <Trash2 className="h-3 w-3" />
                               <span>{deletingId === log.id ? '...' : 'Delete'}</span>
@@ -708,10 +756,10 @@ export default function DashboardPage() {
                           <Camera className="h-5 w-5" />
                         </div>
                         <div className="font-semibold text-slate-600">
-                          Wala pang naitalang {recentTab === 'entry' ? 'entry' : 'exit'} scans o barcode tap ngayon.
+                          No recorded {recentTab === 'entry' ? 'entry' : 'exit'} scans or barcode taps today.
                         </div>
                         <p className="text-[11px] text-slate-400 max-w-sm">
-                          Maaari kang mag-scan gamit ang Live Camera Scanner sa kaliwang menu o mag-upload ng masterlist ng estudyante.
+                          Scan via Live Camera Scanner or upload student masterlist to record gate activity.
                         </p>
                       </div>
                     </td>

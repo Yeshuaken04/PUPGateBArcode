@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAdminClient } from '@/lib/supabase/admin';
 
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
@@ -115,22 +118,31 @@ export async function GET(request: NextRequest) {
     const safeAllowed = allowedScans || 0;
     const approvalRate = safeTotal > 0 ? ((safeAllowed / safeTotal) * 100).toFixed(1) : '100.0';
 
-    return NextResponse.json({
-      success: true,
-      data: {
-        studentCount: studentCount || 0,
-        facultyCount: facultyCount || 0,
-        visitorCount: visitorCount || 0,
-        vehicleCount: vehicleCount || 0,
-        insideCount: presenceInside !== null && presenceInside !== undefined ? presenceInside : Math.max(0, (entriesToday || 0) - (exitsToday || 0)),
-        entriesToday: entriesToday || 0,
-        exitsToday: exitsToday || 0,
-        deniedToday: deniedToday || 0,
-        totalScans: safeTotal,
-        approvalRate,
-        hourlyDistribution,
+    return NextResponse.json(
+      {
+        success: true,
+        data: {
+          studentCount: studentCount || 0,
+          facultyCount: facultyCount || 0,
+          visitorCount: visitorCount || 0,
+          vehicleCount: vehicleCount || 0,
+          insideCount: presenceInside !== null && presenceInside !== undefined ? presenceInside : Math.max(0, (entriesToday || 0) - (exitsToday || 0)),
+          entriesToday: entriesToday || 0,
+          exitsToday: exitsToday || 0,
+          deniedToday: deniedToday || 0,
+          totalScans: safeTotal,
+          approvalRate,
+          hourlyDistribution,
+        },
       },
-    });
+      {
+        headers: {
+          'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0',
+        },
+      }
+    );
   } catch (err: any) {
     console.error('[GET_STATS_ERROR]', err);
     return NextResponse.json({ error: err?.message || 'Server error' }, { status: 500 });

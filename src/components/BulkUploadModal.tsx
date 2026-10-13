@@ -170,7 +170,7 @@ export default function BulkUploadModal({
         const rawJson: any[] = XLSX.utils.sheet_to_json(sheet, { defval: '' });
 
         if (rawJson.length === 0) {
-          setUploadError('Walang laman o walang valid na rows ang napiling Excel file.');
+          setUploadError('The selected file is empty or contains no valid rows.');
           return;
         }
 
@@ -211,30 +211,30 @@ export default function BulkUploadModal({
 
           // Strict ID Check
           if (!idNum) {
-            errors.push('Kulang ang ID / Student Number.');
+            errors.push('ID / Student Number is required.');
           } else if (idNum === '-1' || idNum.startsWith('-')) {
-            errors.push('Bawal ang negative number o "-1" sa ID.');
+            errors.push('Negative numbers or "-1" are not allowed in ID.');
           }
 
           // Strict Name Check (letters only, NO numbers or -1)
           if (!firstName) {
-            errors.push('Kulang ang First Name.');
+            errors.push('First Name is required.');
           } else if (firstName === '-1' || firstName.includes('-1')) {
-            errors.push('Bawal ang "-1" sa First Name.');
+            errors.push('"-1" is not allowed in First Name.');
           } else if (!NAME_REGEX.test(firstName)) {
-            errors.push('First Name: Mga letra lamang ang pwede (bawal ang numero o symbols).');
+            errors.push('First Name: Letters only (numbers and symbols not allowed).');
           }
 
           if (!lastName) {
-            errors.push('Kulang ang Last Name.');
+            errors.push('Last Name is required.');
           } else if (lastName === '-1' || lastName.includes('-1')) {
-            errors.push('Bawal ang "-1" sa Last Name.');
+            errors.push('"-1" is not allowed in Last Name.');
           } else if (!NAME_REGEX.test(lastName)) {
-            errors.push('Last Name: Mga letra lamang ang pwede (bawal ang numero).');
+            errors.push('Last Name: Letters only (numbers not allowed).');
           }
 
           if (middleName && (!NAME_REGEX.test(middleName) || middleName === '-1')) {
-            errors.push('Middle Name: Bawal ang numero o "-1".');
+            errors.push('Middle Name: Numbers or "-1" are not allowed.');
           }
 
           // Parse role / person_type
@@ -271,11 +271,11 @@ export default function BulkUploadModal({
           let yearLevel: number | null = null;
           if (rawYear) {
             if (rawYear === '-1' || rawYear.startsWith('-')) {
-              errors.push('Bawal ang negative o "-1" sa Year Level.');
+              errors.push('Negative values or "-1" are not allowed in Year Level.');
             } else {
               const num = parseInt(rawYear, 10);
               if (isNaN(num) || num < 1 || num > 4) {
-                errors.push('Year level must be between 1 and 4 (Hanggang 4th year lamang).');
+                errors.push('Year level must be between 1 and 4.');
               } else {
                 yearLevel = num;
               }
@@ -286,7 +286,7 @@ export default function BulkUploadModal({
           let cleanedContact: string | undefined = undefined;
           if (contact) {
             if (contact === '-1' || contact.includes('-1')) {
-              errors.push('Bawal ang "-1" sa Contact Number.');
+              errors.push('"-1" is not allowed in Contact Number.');
             } else if (!PHONE_REGEX.test(contact)) {
               errors.push('Contact must be an 11-digit PH mobile number (09xxxxxxxxx).');
             } else {
@@ -337,7 +337,7 @@ export default function BulkUploadModal({
   const handleConfirmImport = async () => {
     const validRows = parsedRows.filter((r) => r.isValid);
     if (validRows.length === 0) {
-      setUploadError('Walang valid na records na pwedeng i-save.');
+      setUploadError('No valid records to save.');
       return;
     }
 
@@ -387,7 +387,7 @@ export default function BulkUploadModal({
 
       const resData = await res.json();
       if (!res.ok) {
-        throw new Error(resData.error || 'Nabigo ang pag-upload sa database.');
+        throw new Error(resData.error || 'Database upload failed.');
       }
       setUploadProgress(100);
 
@@ -432,7 +432,7 @@ export default function BulkUploadModal({
                 Bulk Add & Verification Upload (Excel / CSV)
               </h3>
               <p className="text-xs text-slate-500">
-                I-upload ang masterlist ng students, teachers/faculty, staff, at visitors para ma-verify sa database
+                Upload student, faculty, staff, and visitor masterlist for campus verification
               </p>
             </div>
           </div>
@@ -451,9 +451,9 @@ export default function BulkUploadModal({
             <div className="flex items-start gap-3">
               <AlertTriangle className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
               <div className="text-xs text-amber-900">
-                <span className="font-bold">May strict validation ang system:</span> Bawal ang numero o{' '}
-                <code className="rounded bg-white px-1.5 py-0.5 font-mono font-bold text-pup-800">-1</code> sa pangalan,
-                bawal ang negative numbers, at kailangan valid ang ID format.
+                <span className="font-bold">Strict system validation active:</span> Numbers or{' '}
+                <code className="rounded bg-white px-1.5 py-0.5 font-mono font-bold text-pup-800">-1</code> are not allowed in names,
+                negative numbers are barred, and IDs must have a valid format.
               </div>
             </div>
             <button
@@ -471,7 +471,7 @@ export default function BulkUploadModal({
             <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-5 text-emerald-900 space-y-3">
               <div className="flex items-center gap-2.5 font-black text-emerald-950">
                 <CheckCircle2 className="h-6 w-6 text-emerald-600" />
-                Matagumpay na na-upload at na-verify ang {uploadSuccessSummary.total} records sa database!
+                Successfully uploaded and verified {uploadSuccessSummary.total} records in database!
               </div>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1 text-xs">
                 <div className="rounded-xl bg-white p-2.5 shadow-xs border border-emerald-100">
@@ -512,10 +512,10 @@ export default function BulkUploadModal({
                 <Upload className="h-7 w-7" />
               </div>
               <div className="mt-3 text-sm font-bold text-slate-800">
-                Pindutin o i-drag dito ang inyong Excel / CSV file
+                Click or drag your Excel / CSV file here
               </div>
               <p className="mt-1 text-xs text-slate-500">
-                Tumatanggap ng .xlsx, .xls, o .csv format (hanggang 2,000+ rows)
+                Supports .xlsx, .xls, or .csv formats (up to 2,000+ rows)
               </p>
               <input
                 ref={fileInputRef}
@@ -536,7 +536,7 @@ export default function BulkUploadModal({
                   <div>
                     <div className="text-xs font-bold text-slate-900">{file.name}</div>
                     <div className="text-[11px] text-slate-500">
-                      {(file.size / 1024).toFixed(1)} KB • {parsedRows.length} kabuuang rows na-detect
+                      {(file.size / 1024).toFixed(1)} KB • {parsedRows.length} total rows detected
                     </div>
                   </div>
                 </div>
@@ -552,7 +552,7 @@ export default function BulkUploadModal({
                     type="button"
                     className="rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-100"
                   >
-                    Palitan ang File
+                    Change File
                   </button>
                 </div>
               </div>
@@ -568,7 +568,7 @@ export default function BulkUploadModal({
                         : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                     }`}
                   >
-                    Lahat ({parsedRows.length})
+                    All ({parsedRows.length})
                   </button>
                   <button
                     onClick={() => setFilterView('valid')}
@@ -590,12 +590,12 @@ export default function BulkUploadModal({
                     }`}
                   >
                     <XCircle className="h-3.5 w-3.5" />
-                    May Error ({invalidCount})
+                    Errors ({invalidCount})
                   </button>
                 </div>
 
                 <div className="text-[11px] font-semibold text-slate-500">
-                  {validCount} sa {parsedRows.length} ang handang i-save
+                  {validCount} of {parsedRows.length} ready to save
                 </div>
               </div>
 
@@ -655,7 +655,7 @@ export default function BulkUploadModal({
                               </span>
                             ) : (
                               <span className="inline-flex items-center gap-1 text-[11px] font-bold text-rose-700">
-                                <XCircle className="h-3 w-3" /> May Error
+                                <XCircle className="h-3 w-3" /> Error
                               </span>
                             )}
                           </td>
@@ -665,7 +665,7 @@ export default function BulkUploadModal({
                                 {r.errors.join('; ')}
                               </span>
                             ) : (
-                              <span className="text-slate-400">Handa nang i-verify</span>
+                              <span className="text-slate-400">Ready to verify</span>
                             )}
                           </td>
                         </tr>
@@ -673,7 +673,7 @@ export default function BulkUploadModal({
                     ) : (
                       <tr>
                         <td colSpan={7} className="py-8 text-center text-xs text-slate-400">
-                          Walang records sa filter na ito.
+                          No records found under this filter.
                         </td>
                       </tr>
                     )}
@@ -692,7 +692,7 @@ export default function BulkUploadModal({
             disabled={isProcessing}
             className="rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-xs font-bold text-slate-700 hover:bg-slate-100 transition disabled:opacity-50"
           >
-            Isara
+            Close
           </button>
 
           {file && (
@@ -700,7 +700,7 @@ export default function BulkUploadModal({
               {isProcessing && (
                 <div className="flex items-center gap-2 text-xs font-semibold text-pup-800">
                   <RefreshCw className="h-4 w-4 animate-spin" />
-                  <span>Nagsusulat sa database ({uploadProgress}%)...</span>
+                  <span>Saving to database ({uploadProgress}%)...</span>
                 </div>
               )}
               <button
@@ -710,7 +710,7 @@ export default function BulkUploadModal({
                 className="flex items-center gap-2 rounded-xl bg-pup-700 px-5 py-2.5 text-xs font-bold text-white shadow-sm hover:bg-pup-800 transition disabled:opacity-50 cursor-pointer"
               >
                 <UserCheck className="h-4 w-4" />
-                <span>I-save ang {validCount} Valid Records sa Database</span>
+                <span>Save {validCount} Valid Records to Database</span>
               </button>
             </div>
           )}
