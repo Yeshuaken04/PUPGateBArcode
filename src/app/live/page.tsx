@@ -209,9 +209,6 @@ export default function LiveScannerPage() {
                   <div className="relative h-48 w-64 rounded-2xl border-2 border-emerald-400/80 bg-emerald-500/5 shadow-[0_0_20px_rgba(16,185,129,0.3)] flex items-center justify-center">
                     {/* Animated Red Scanning Laser */}
                     <div className="absolute left-2 right-2 h-0.5 bg-rose-500 shadow-[0_0_8px_#f43f5e] animate-bounce" />
-                    <div className="text-[11px] font-bold tracking-wider uppercase text-emerald-300/80">
-                      I-align ang Barcode Dito
-                    </div>
                   </div>
                   <div className="mt-3 rounded-full bg-black/60 px-3 py-1 font-mono text-[10px] text-slate-300 backdrop-blur-sm">
                     {gateCode} • {direction.toUpperCase()}

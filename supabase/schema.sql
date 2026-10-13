@@ -157,6 +157,7 @@ CREATE OR REPLACE FUNCTION public.process_gate_scan(
 RETURNS JSONB
 LANGUAGE plpgsql
 SECURITY DEFINER
+SET search_path = public
 AS $$
 DECLARE
   v_gate RECORD;
@@ -326,6 +327,7 @@ CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS TRIGGER
 LANGUAGE plpgsql
 SECURITY DEFINER
+SET search_path = public
 AS $$
 BEGIN
   INSERT INTO public.profiles (id, full_name, role, active)
@@ -341,6 +343,13 @@ BEGIN
   RETURN NEW;
 END;
 $$;
+
+-- Restrict execution of trigger and scan functions
+REVOKE EXECUTE ON FUNCTION public.handle_new_user() FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.handle_new_user() FROM anon, authenticated;
+REVOKE EXECUTE ON FUNCTION public.process_gate_scan(TEXT, TEXT, TEXT, TEXT, TEXT, TIMESTAMPTZ) FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.process_gate_scan(TEXT, TEXT, TEXT, TEXT, TEXT, TIMESTAMPTZ) FROM anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.process_gate_scan(TEXT, TEXT, TEXT, TEXT, TEXT, TIMESTAMPTZ) TO service_role;
 
 DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
 CREATE TRIGGER on_auth_user_created
@@ -363,6 +372,7 @@ CREATE OR REPLACE FUNCTION public.current_user_role()
 RETURNS TEXT
 LANGUAGE sql
 STABLE
+SET search_path = public
 AS $$
   SELECT role FROM public.profiles WHERE id = auth.uid() LIMIT 1;
 $$;
@@ -408,14 +418,20 @@ CREATE POLICY "Logs readable by authenticated users" ON public.access_logs
   FOR SELECT TO authenticated USING (true);
 
 CREATE POLICY "Logs insertable by system or guards" ON public.access_logs
-  FOR INSERT TO authenticated WITH CHECK (true);
+  FOR INSERT TO authenticated WITH CHECK (
+    public.current_user_role() IN ('super_admin', 'admin', 'guard')
+  );
 
 -- STUDENT PRESENCE Policies
 CREATE POLICY "Presence readable by authenticated users" ON public.student_presence
   FOR SELECT TO authenticated USING (true);
 
-CREATE POLICY "Presence modifiable by authenticated users" ON public.student_presence
-  FOR ALL TO authenticated USING (true);
+CREATE POLICY "Presence modifiable by guards or admin" ON public.student_presence
+  FOR ALL TO authenticated USING (
+    public.current_user_role() IN ('super_admin', 'admin', 'guard')
+  ) WITH CHECK (
+    public.current_user_role() IN ('super_admin', 'admin', 'guard')
+  );
 
 -- GATE ACTIONS Policies
 CREATE POLICY "Gate actions readable by authenticated users" ON public.gate_actions

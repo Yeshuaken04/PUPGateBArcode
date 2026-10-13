@@ -13,6 +13,8 @@ import {
   UserCheck,
   ShieldCheck,
   ShieldAlert,
+  Edit,
+  Trash2,
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { isValidUUID } from '@/lib/utils';
@@ -42,97 +44,29 @@ export default function VehiclesPage() {
   const loadData = async () => {
     setLoading(true);
     try {
-      const supabase = createClient();
+      const [vRes, sRes] = await Promise.all([
+        fetch('/api/vehicles'),
+        fetch('/api/students'),
+      ]);
+      const [vJson, sJson] = await Promise.all([
+        vRes.json(),
+        sRes.json(),
+      ]);
 
-      // Load vehicles
-      const { data: vehicleData } = await supabase
-        .from('vehicles')
-        .select('*, student:students(*)')
-        .order('plate_number', { ascending: true });
-
-      if (vehicleData && vehicleData.length > 0) {
-        setVehicles(vehicleData as any);
+      if (vRes.ok && vJson.data) {
+        setVehicles(vJson.data);
       } else {
-        // Fallback data for offline mode with real RFC4122 UUIDs
-        setVehicles([
-          {
-            id: 'eb0d191d-9125-4266-8d17-c1a64098e1ab',
-            student_id: 'b7db68a3-8dff-4bf4-a8fc-fd56d6df4cbc',
-            plate_number: 'ABC-1234',
-            brand_model: 'Yamaha Aerox 155',
-            vehicle_type: 'motorcycle',
-            color: 'Black',
-            is_active: true,
-            created_at: '',
-            student: {
-              id: 'b7db68a3-8dff-4bf4-a8fc-fd56d6df4cbc',
-              student_number: '2021-12345',
-              first_name: 'Juan',
-              last_name: 'Dela Cruz',
-              person_type: 'student',
-              course: 'BSIT',
-              status: 'active',
-              created_at: '',
-              updated_at: '',
-            },
-          },
-          {
-            id: 'f84fc8c4-b1cb-4d70-94fe-2d878a9b84a4',
-            student_id: 'e835b631-1b86-414d-a499-998025381282',
-            plate_number: 'DEF-5678',
-            brand_model: 'Honda Click 125',
-            vehicle_type: 'motorcycle',
-            color: 'Red',
-            is_active: true,
-            created_at: '',
-            student: {
-              id: 'e835b631-1b86-414d-a499-998025381282',
-              student_number: '2022-06789',
-              first_name: 'Maria',
-              last_name: 'Santos',
-              person_type: 'student',
-              course: 'BSBA',
-              status: 'active',
-              created_at: '',
-              updated_at: '',
-            },
-          },
-          {
-            id: '0f3b794e-e212-44e3-b258-4340cf657634',
-            student_id: '07176a69-2b3c-4304-9fb8-1738899a06f5',
-            plate_number: 'GHI-9012',
-            brand_model: 'Toyota Vios',
-            vehicle_type: 'car',
-            color: 'White',
-            is_active: true,
-            created_at: '',
-            student: {
-              id: '07176a69-2b3c-4304-9fb8-1738899a06f5',
-              student_number: '2021-09876',
-              first_name: 'Mark',
-              last_name: 'Reyes',
-              person_type: 'faculty',
-              course: '',
-              status: 'active',
-              created_at: '',
-              updated_at: '',
-            },
-          },
-        ]);
+        setVehicles([]);
       }
 
-      // Load registered students for vehicle assignment & verification
-      const { data: studentList } = await supabase
-        .from('students')
-        .select('*')
-        .eq('status', 'active')
-        .order('first_name', { ascending: true });
-
-      if (studentList && studentList.length > 0) {
-        setStudents(studentList as any);
+      if (sRes.ok && sJson.data) {
+        setStudents(sJson.data.filter((s: Student) => s.status === 'active'));
+      } else {
+        setStudents([]);
       }
     } catch {
-      // ignore
+      setVehicles([]);
+      setStudents([]);
     } finally {
       setLoading(false);
     }
@@ -181,6 +115,41 @@ export default function VehiclesPage() {
     setModalOpen(true);
   };
 
+  const handleEditVehicle = (v: Vehicle) => {
+    setForm({
+      id: v.id,
+      student_id: v.student_id,
+      plate_number: v.plate_number,
+      brand_model: v.brand_model,
+      vehicle_type: v.vehicle_type as any,
+      color: v.color || '',
+    });
+    if (v.student) {
+      setSelectedStudent(v.student);
+    } else {
+      const match = students.find((s) => s.id === v.student_id);
+      setSelectedStudent(match || null);
+    }
+    setStudentSearchQuery('');
+    setFormErrors({});
+    setSubmitError(null);
+    setModalOpen(true);
+  };
+
+  const handleDeleteVehicle = async (v: Vehicle) => {
+    if (!confirm(`Sigurado ka bang nais mong burahin ang sasakyan na may plakang "${v.plate_number}"?`)) return;
+    try {
+      const res = await fetch(`/api/vehicles?id=${encodeURIComponent(v.id)}`, {
+        method: 'DELETE',
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Hindi nabura ang sasakyan.');
+      loadData();
+    } catch (err: any) {
+      alert(err?.message || 'Error sa pagbura ng sasakyan.');
+    }
+  };
+
   const handleSaveVehicle = async (e: React.FormEvent) => {
     e.preventDefault();
     setSubmitError(null);
@@ -219,6 +188,7 @@ export default function VehiclesPage() {
 
     try {
       const payload = {
+        id: form.id || undefined,
         student_id: selectedStudent.id || selectedStudent.student_number,
         plate_number: form.plate_number.trim().toUpperCase(),
         brand_model: form.brand_model.trim(),
@@ -295,6 +265,7 @@ export default function VehiclesPage() {
                   <th className="px-4 py-3">Uri ng Sasakyan</th>
                   <th className="px-4 py-3">Kulay</th>
                   <th className="px-4 py-3">Barrier Pass Status</th>
+                  <th className="px-4 py-3 text-right">Aksyon</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -333,11 +304,29 @@ export default function VehiclesPage() {
                           <CheckCircle2 className="h-3 w-3" /> ACTIVE PASS
                         </span>
                       </td>
+                      <td className="whitespace-nowrap px-4 py-3 text-right">
+                        <div className="flex items-center justify-end gap-1">
+                          <button
+                            onClick={() => handleEditVehicle(v)}
+                            title="I-edit ang Sasakyan"
+                            className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100 hover:text-pup-700 transition"
+                          >
+                            <Edit className="h-4 w-4" />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteVehicle(v)}
+                            title="Burahin ang Sasakyan"
+                            className="rounded-lg p-1.5 text-slate-400 hover:bg-rose-50 hover:text-rose-600 transition"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </div>
+                      </td>
                     </tr>
                   ))
                 ) : (
                   <tr>
-                    <td colSpan={8} className="py-10 text-center text-xs text-slate-400">
+                    <td colSpan={9} className="py-10 text-center text-xs text-slate-400">
                       Walang rehistradong sasakyan na tumutugma sa search.
                     </td>
                   </tr>
@@ -354,7 +343,9 @@ export default function VehiclesPage() {
           <div className="w-full max-w-lg rounded-3xl bg-white p-6 shadow-2xl max-h-[92vh] overflow-y-auto">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <div>
-                <h3 className="text-base font-black text-slate-900">Mag-register ng Vehicle Pass</h3>
+                <h3 className="text-base font-black text-slate-900">
+                  {form.id ? 'I-edit ang Vehicle Pass' : 'Mag-register ng Vehicle Pass'}
+                </h3>
                 <p className="text-xs text-slate-500">
                   Dapat may-ari ay verified student o faculty na nasa database.
                 </p>

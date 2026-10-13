@@ -63,14 +63,11 @@ export default function DashboardPage() {
     if (!confirm('Sigurado ka bang nais mong burahin ang scan log na ito mula sa dashboard at database?')) return;
     setDeletingId(id);
     try {
-      const supabase = createClient();
-      const { error } = await supabase.from('access_logs').delete().eq('id', id);
-      if (!error) {
-        setLogs((prev) => prev.filter((l) => l.id !== id));
-        fetchDashboardData();
-      } else {
-        alert('Hindi nabura ang log: ' + error.message);
-      }
+      const res = await fetch(`/api/logs?id=${encodeURIComponent(id)}`, { method: 'DELETE' });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || 'Hindi nabura ang log.');
+      setLogs((prev) => prev.filter((l) => l.id !== id));
+      fetchDashboardData();
     } catch (err: any) {
       alert(err?.message || 'Error habang binubura ang log');
     } finally {
@@ -82,113 +79,69 @@ export default function DashboardPage() {
     if (!confirm('Sigurado ka bang nais mong burahin ang LAHAT ng kasalukuyang gate logs sa dashboard at database?')) return;
     setLoading(true);
     try {
-      const supabase = createClient();
-      const { error } = await supabase.from('access_logs').delete().neq('id', '00000000-0000-0000-0000-000000000000');
-      if (!error) {
-        setLogs([]);
-        setEntriesTodayCount(0);
-        setExitsTodayCount(0);
-        setDeniedTodayCount(0);
-      } else {
-        alert('Hindi nabura ang mga log: ' + error.message);
-      }
+      const res = await fetch('/api/logs?all=true', { method: 'DELETE' });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || 'Hindi nabura ang mga log.');
+      setLogs([]);
+      setEntriesTodayCount(0);
+      setExitsTodayCount(0);
+      setDeniedTodayCount(0);
+      fetchDashboardData();
     } catch (err: any) {
       alert(err?.message || 'Error');
     } finally {
       setLoading(false);
-      fetchDashboardData();
     }
   };
 
   const fetchDashboardData = async () => {
     setLoading(true);
     try {
-      const supabase = createClient();
+      const [logsRes, statsRes] = await Promise.all([
+        fetch('/api/logs?limit=30'),
+        fetch('/api/stats'),
+      ]);
+      const [logsJson, statsJson] = await Promise.all([
+        logsRes.json(),
+        statsRes.json(),
+      ]);
 
-      // 1. Check user role
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('full_name, role, department')
-          .eq('id', user.id)
-          .single();
-
-        if (profile) {
-          setUserRole(profile.role as any || 'guard');
-          setUserFullName(profile.full_name || 'Authorized User');
-          if (profile.department) setUserDepartment(profile.department);
-        }
-      }
-
-      // 2. Fetch live logs (real logs only)
-      const { data: logRecords } = await supabase
-        .from('access_logs')
-        .select(`
-          *,
-          student:students(*),
-          vehicle:vehicles(*),
-          gate:gates(*)
-        `)
-        .order('scanned_at', { ascending: false })
-        .limit(30);
-
-      if (logRecords && Array.isArray(logRecords)) {
-        setLogs(logRecords as any);
+      if (logsRes.ok && logsJson.data) {
+        setLogs(logsJson.data);
       } else {
         setLogs([]);
       }
 
-      // 3. Fetch real presence count (students inside)
-      const { count: currentInside } = await supabase
-        .from('student_presence')
-        .select('*', { count: 'exact', head: true })
-        .eq('current_status', 'inside');
+      if (statsRes.ok && statsJson.data) {
+        const s = statsJson.data;
+        setVerifiedStudentCount(s.studentCount || 0);
+        setFacultyCount(s.facultyCount || 0);
+        setInsideCount(s.insideCount || 0);
+        setEntriesTodayCount(s.entriesToday || 0);
+        setExitsTodayCount(s.exitsToday || 0);
+        setDeniedTodayCount(s.deniedToday || 0);
+      }
 
-      setInsideCount(currentInside !== null ? currentInside : 0);
+      // Check user role from supabase auth if available
+      try {
+        const supabase = createClient();
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('full_name, role, department')
+            .eq('id', user.id)
+            .single();
 
-      // 4. Fetch real student count
-      const { count: sCount } = await supabase
-        .from('students')
-        .select('*', { count: 'exact', head: true })
-        .eq('person_type', 'student');
-      setVerifiedStudentCount(sCount !== null ? sCount : 0);
-
-      // 5. Fetch real faculty count
-      const { count: fCount } = await supabase
-        .from('students')
-        .select('*', { count: 'exact', head: true })
-        .eq('person_type', 'faculty');
-      setFacultyCount(fCount !== null ? fCount : 0);
-
-      // 6. Fetch real today counts (using UTC date start)
-      const todayStart = new Date();
-      todayStart.setHours(0, 0, 0, 0);
-      const todayIso = todayStart.toISOString();
-
-      const { count: eToday } = await supabase
-        .from('access_logs')
-        .select('*', { count: 'exact', head: true })
-        .eq('direction', 'entry')
-        .gte('scanned_at', todayIso);
-      setEntriesTodayCount(eToday !== null ? eToday : 0);
-
-      const { count: xToday } = await supabase
-        .from('access_logs')
-        .select('*', { count: 'exact', head: true })
-        .eq('direction', 'exit')
-        .gte('scanned_at', todayIso);
-      setExitsTodayCount(xToday !== null ? xToday : 0);
-
-      const { count: dToday } = await supabase
-        .from('access_logs')
-        .select('*', { count: 'exact', head: true })
-        .eq('result', 'denied')
-        .gte('scanned_at', todayIso);
-      setDeniedTodayCount(dToday !== null ? dToday : 0);
-
+          if (profile) {
+            setUserRole((profile.role as any) || 'guard');
+            setUserFullName(profile.full_name || 'Authorized User');
+            if (profile.department) setUserDepartment(profile.department);
+          }
+        }
+      } catch {}
     } catch {
-      // In case Supabase credentials aren't set yet, cleanly default to 0
+      // Clean 0 defaults
       setLogs([]);
       setInsideCount(0);
       setVerifiedStudentCount(0);

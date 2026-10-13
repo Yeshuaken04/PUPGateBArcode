@@ -19,6 +19,7 @@ import {
   ArrowDownLeft,
   ArrowUpRight,
   ClipboardList,
+  Trash2,
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { formatDateTime, formatTimeOnly, isToday } from '@/lib/utils';
@@ -53,21 +54,10 @@ function AccessLogsContent() {
   const loadLogs = async () => {
     setLoading(true);
     try {
-      const supabase = createClient();
-      let query = supabase
-        .from('access_logs')
-        .select(`
-          *,
-          student:students(*),
-          vehicle:vehicles(*),
-          gate:gates(*)
-        `)
-        .order('scanned_at', { ascending: false })
-        .limit(200);
-
-      const { data, error } = await query;
-      if (!error && data) {
-        setLogs(data as any);
+      const res = await fetch('/api/logs?limit=200');
+      const json = await res.json();
+      if (res.ok && json.data) {
+        setLogs(json.data);
       } else {
         setLogs([]);
       }
@@ -75,6 +65,18 @@ function AccessLogsContent() {
       setLogs([]);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleDeleteLog = async (id: string) => {
+    if (!confirm('Sigurado ka bang nais mong burahin ang log na ito mula sa database?')) return;
+    try {
+      const res = await fetch(`/api/logs?id=${encodeURIComponent(id)}`, { method: 'DELETE' });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || 'Hindi nabura ang log.');
+      loadLogs();
+    } catch (err: any) {
+      alert(err?.message || 'Error sa pagbura ng log');
     }
   };
 
@@ -99,7 +101,7 @@ function AccessLogsContent() {
       entriesDenied,
       exitsAllowed,
       exitsDenied,
-      insideEst: Math.max(0, entriesAllowed - exitsAllowed + 1320),
+      insideEst: Math.max(0, entriesAllowed - exitsAllowed),
     };
   }, [logs]);
 
@@ -446,6 +448,7 @@ function AccessLogsContent() {
                   <th className="px-3.5 py-3">Gate</th>
                   <th className="px-3.5 py-3">Credential</th>
                   <th className="px-3.5 py-3">Result</th>
+                  <th className="px-3.5 py-3 text-right">Aksyon</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 bg-white">
@@ -534,12 +537,23 @@ function AccessLogsContent() {
                             </div>
                           )}
                         </td>
+
+                        {/* Action Delete */}
+                        <td className="whitespace-nowrap px-3.5 py-3 text-right">
+                          <button
+                            onClick={() => handleDeleteLog(log.id)}
+                            title="Burahin ang Log"
+                            className="rounded-lg p-1.5 text-slate-400 hover:bg-rose-50 hover:text-rose-600 transition"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </td>
                       </tr>
                     );
                   })
                 ) : (
                   <tr>
-                    <td colSpan={8} className="py-12 text-center">
+                    <td colSpan={9} className="py-12 text-center">
                       <div className="mx-auto mb-2 flex h-10 w-10 items-center justify-center rounded-full bg-slate-100 text-slate-400">
                         <Search className="h-5 w-5" />
                       </div>

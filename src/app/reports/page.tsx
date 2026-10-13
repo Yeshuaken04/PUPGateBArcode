@@ -1,8 +1,8 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import DashboardLayout from '@/components/DashboardLayout';
-import { BarChart3, Download, Calendar, ArrowUpRight, ShieldCheck, ShieldAlert } from 'lucide-react';
+import { BarChart3, Download, Calendar, ArrowUpRight, ShieldCheck, ShieldAlert, RefreshCw } from 'lucide-react';
 import {
   BarChart,
   Bar,
@@ -14,23 +14,77 @@ import {
   Legend,
 } from 'recharts';
 
+interface HourlyData {
+  label: string;
+  entries: number;
+  exits: number;
+  denied: number;
+}
+
 export default function ReportsPage() {
   const [period, setPeriod] = useState<'daily' | 'weekly' | 'monthly'>('daily');
+  const [loading, setLoading] = useState(false);
+  const [stats, setStats] = useState({
+    studentCount: 0,
+    facultyCount: 0,
+    visitorCount: 0,
+    vehicleCount: 0,
+    insideCount: 0,
+    entriesToday: 0,
+    exitsToday: 0,
+    deniedToday: 0,
+    totalScans: 0,
+    approvalRate: '100.0',
+    hourlyDistribution: [] as HourlyData[],
+  });
 
-  const dailyData = [
-    { label: '07 AM', entries: 60, exits: 10, denied: 1 },
-    { label: '08 AM', entries: 210, exits: 15, denied: 3 },
-    { label: '09 AM', entries: 120, exits: 30, denied: 0 },
-    { label: '10 AM', entries: 80, exits: 50, denied: 1 },
-    { label: '11 AM', entries: 95, exits: 90, denied: 2 },
-    { label: '12 PM', entries: 140, exits: 160, denied: 1 },
-    { label: '01 PM', entries: 110, exits: 105, denied: 0 },
-    { label: '02 PM', entries: 75, exits: 145, denied: 1 },
-    { label: '03 PM', entries: 50, exits: 190, denied: 0 },
-  ];
+  const loadStats = async () => {
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/stats?period=${period}`);
+      const json = await res.json();
+      if (res.ok && json.data) {
+        setStats(json.data);
+      }
+    } catch {
+      // keep 0
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadStats();
+  }, [period]);
+
+  const peakHour = useMemo(() => {
+    if (!stats.hourlyDistribution || stats.hourlyDistribution.length === 0) return { label: 'None', total: 0 };
+    let best = { label: 'None', total: 0 };
+    for (const h of stats.hourlyDistribution) {
+      const tot = h.entries + h.exits;
+      if (tot > best.total) {
+        best = { label: h.label, total: tot };
+      }
+    }
+    return best;
+  }, [stats.hourlyDistribution]);
 
   const handleExport = () => {
-    const reportText = `PUP BATAAN AUTOMATED GATE SYSTEM - AUDIT REPORT\nGenerated at: ${new Date().toLocaleString()}\nPeriod: ${period.toUpperCase()}\nStatus: Verified\nTotal Inbound Entries: 940\nTotal Outbound Exits: 795\nAuthorized Scan Rate: 98.9%\nDenied Attempts: 9`;
+    const reportText = `PUP BATAAN AUTOMATED GATE SYSTEM - OFFICIAL AUDIT REPORT
+Generated at: ${new Date().toLocaleString()}
+Period: ${period.toUpperCase()}
+Status: Verified Cloud PostgreSQL Records
+Total Scans: ${stats.totalScans}
+Inbound Entries: ${stats.entriesToday}
+Outbound Exits: ${stats.exitsToday}
+Denied Attempts: ${stats.deniedToday}
+Authorized Scan Rate: ${stats.approvalRate}%
+Peak Traffic Hour: ${peakHour.label} (${peakHour.total} scans)
+Active Students in Database: ${stats.studentCount}
+Active Faculty in Database: ${stats.facultyCount}
+Active Vehicles in Database: ${stats.vehicleCount}
+Estimated Present on Campus: ${stats.insideCount}`;
+
     const blob = new Blob([reportText], { type: 'text/plain;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -52,7 +106,7 @@ export default function ReportsPage() {
             <button
               onClick={() => setPeriod('daily')}
               className={`rounded-lg px-4 py-1.5 text-xs font-bold transition ${
-                period === 'daily' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500'
+                period === 'daily' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-800'
               }`}
             >
               Today
@@ -60,7 +114,7 @@ export default function ReportsPage() {
             <button
               onClick={() => setPeriod('weekly')}
               className={`rounded-lg px-4 py-1.5 text-xs font-bold transition ${
-                period === 'weekly' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500'
+                period === 'weekly' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-800'
               }`}
             >
               This Week
@@ -68,55 +122,73 @@ export default function ReportsPage() {
             <button
               onClick={() => setPeriod('monthly')}
               className={`rounded-lg px-4 py-1.5 text-xs font-bold transition ${
-                period === 'monthly' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500'
+                period === 'monthly' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-800'
               }`}
             >
               This Month
             </button>
           </div>
 
-          <button
-            onClick={handleExport}
-            className="flex items-center gap-1.5 rounded-xl bg-pup-700 px-4 py-2 text-xs font-bold text-white shadow-sm hover:bg-pup-800 transition"
-          >
-            <Download className="h-4 w-4" />
-            <span>Export Official Report</span>
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={loadStats}
+              title="Refresh Analytics"
+              className="rounded-xl border border-slate-300 p-2.5 text-slate-600 hover:bg-slate-50"
+            >
+              <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+            </button>
+            <button
+              onClick={handleExport}
+              className="flex items-center gap-1.5 rounded-xl bg-pup-700 px-4 py-2 text-xs font-bold text-white shadow-sm hover:bg-pup-800 transition"
+            >
+              <Download className="h-4 w-4" />
+              <span>Export Official Report</span>
+            </button>
+          </div>
         </div>
 
         {/* Stats Row */}
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
             <div className="text-xs font-bold uppercase text-slate-500">Total Scans</div>
-            <div className="mt-2 text-2xl font-black text-slate-900">1,744</div>
-            <div className="text-[11px] text-emerald-600 font-medium">98.9% Approval rate</div>
+            <div className="mt-2 text-2xl font-black text-slate-900">{stats.totalScans}</div>
+            <div className="text-[11px] text-emerald-600 font-medium">{stats.approvalRate}% Approval rate</div>
           </div>
           <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
             <div className="text-xs font-bold uppercase text-emerald-700">Inbound Entries</div>
-            <div className="mt-2 text-2xl font-black text-emerald-950">940</div>
+            <div className="mt-2 text-2xl font-black text-emerald-950">{stats.entriesToday}</div>
             <div className="text-[11px] text-slate-400">Main Entrance Barrier</div>
           </div>
           <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
             <div className="text-xs font-bold uppercase text-rose-700">Outbound Exits</div>
-            <div className="mt-2 text-2xl font-black text-rose-950">795</div>
+            <div className="mt-2 text-2xl font-black text-rose-950">{stats.exitsToday}</div>
             <div className="text-[11px] text-slate-400">Main Exit Barrier</div>
           </div>
           <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
             <div className="text-xs font-bold uppercase text-amber-700">Peak Traffic Hour</div>
-            <div className="mt-2 text-2xl font-black text-slate-900">08:00 AM</div>
-            <div className="text-[11px] text-slate-400">225 scans / hour</div>
+            <div className="mt-2 text-2xl font-black text-slate-900">{peakHour.label}</div>
+            <div className="text-[11px] text-slate-400">
+              {peakHour.total > 0 ? `${peakHour.total} scans / hour` : 'No scans recorded'}
+            </div>
           </div>
         </div>
 
         {/* Chart */}
         <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-          <h3 className="text-sm font-bold text-slate-900 mb-4">Gate Pass Distribution by Hour</h3>
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-sm font-bold text-slate-900">Gate Pass Distribution by Hour</h3>
+            {stats.totalScans === 0 && (
+              <span className="text-xs font-semibold text-slate-400">
+                (Walang scan logs sa database sa panahong ito)
+              </span>
+            )}
+          </div>
           <div className="h-72">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={dailyData}>
+              <BarChart data={stats.hourlyDistribution}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                 <XAxis dataKey="label" tick={{ fontSize: 11 }} stroke="#94a3b8" />
-                <YAxis tick={{ fontSize: 11 }} stroke="#94a3b8" />
+                <YAxis tick={{ fontSize: 11 }} stroke="#94a3b8" allowDecimals={false} />
                 <Tooltip />
                 <Legend />
                 <Bar dataKey="entries" name="Inbound Entries" fill="#10b981" radius={[4, 4, 0, 0]} />

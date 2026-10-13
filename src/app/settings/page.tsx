@@ -46,13 +46,23 @@ export default function SettingsPage() {
           </div>
 
           <div className="grid gap-3 sm:grid-cols-3 pt-2">
-            <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-              <div className="text-[11px] font-bold uppercase text-slate-500">Hosting Platform</div>
-              <div className="text-sm font-black text-slate-900 mt-1 flex items-center gap-1.5">
-                <Cloud className="h-4 w-4 text-sky-600" />
-                <span>Netlify Next.js</span>
+            <div className="rounded-xl border border-emerald-200 bg-emerald-50/60 p-4">
+              <div className="text-[11px] font-bold uppercase text-emerald-800 flex items-center justify-between">
+                <span>Hosting Platform</span>
+                <span className="flex h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
               </div>
-              <div className="text-[11px] text-emerald-600 font-semibold mt-1">Ready for deploy</div>
+              <div className="text-sm font-black text-slate-900 mt-1 flex items-center gap-1.5">
+                <Cloud className="h-4 w-4 text-emerald-700" />
+                <span>Netlify Cloud</span>
+              </div>
+              <a
+                href="https://pupbarrier.netlify.app"
+                target="_blank"
+                rel="noreferrer"
+                className="text-[11px] text-emerald-700 font-bold hover:underline mt-1 block truncate"
+              >
+                Connected & Live: pupbarrier.netlify.app ↗
+              </a>
             </div>
 
             <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">

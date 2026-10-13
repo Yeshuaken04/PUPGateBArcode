@@ -110,111 +110,15 @@ export default function StudentsPage() {
   const loadStudents = async () => {
     setLoading(true);
     try {
-      const supabase = createClient();
-      const { data, error } = await supabase
-        .from('students')
-        .select('*')
-        .order('student_number', { ascending: true });
-
-      if (!error && data) {
-        setStudents(data);
+      const res = await fetch('/api/students');
+      const json = await res.json();
+      if (res.ok && json.data) {
+        setStudents(json.data);
       } else {
-        // Fallback data for offline mode with real RFC4122 UUIDs
-        setStudents([
-          {
-            id: 'b7db68a3-8dff-4bf4-a8fc-fd56d6df4cbc',
-            student_number: '2021-12345',
-            first_name: 'Juan',
-            middle_name: 'M.',
-            last_name: 'Dela Cruz',
-            person_type: 'student',
-            course: 'BSIT',
-            department: 'College of Computer Studies',
-            year_level: 3,
-            section: 'A',
-            contact_number: '09171234567',
-            rfid_uid: 'RFID-A101',
-            qr_code: 'QR-PUP-2021-12345',
-            status: 'active',
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-          },
-          {
-            id: 'e835b631-1b86-414d-a499-998025381282',
-            student_number: '2022-06789',
-            first_name: 'Maria',
-            middle_name: 'S.',
-            last_name: 'Santos',
-            person_type: 'student',
-            course: 'BSBA',
-            department: 'College of Business Administration',
-            year_level: 2,
-            section: 'B',
-            contact_number: '09181234567',
-            rfid_uid: 'RFID-B202',
-            qr_code: 'QR-PUP-2022-06789',
-            status: 'active',
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-          },
-          {
-            id: '07176a69-2b3c-4304-9fb8-1738899a06f5',
-            student_number: '2021-09876',
-            first_name: 'Mark',
-            middle_name: 'P.',
-            last_name: 'Reyes',
-            person_type: 'faculty',
-            course: '',
-            department: 'College of Engineering',
-            year_level: null,
-            section: '',
-            contact_number: '09191234567',
-            rfid_uid: 'RFID-FAC-01',
-            qr_code: 'QR-FAC-2020-045',
-            status: 'active',
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-          },
-          {
-            id: 'a4798783-2a3d-4e0c-bece-c86b89b81fad',
-            student_number: '2023-11223',
-            first_name: 'Ana',
-            middle_name: 'L.',
-            last_name: 'Cruz',
-            person_type: 'student',
-            course: 'BSCE',
-            department: 'College of Engineering',
-            year_level: 1,
-            section: 'C',
-            contact_number: '09061234567',
-            rfid_uid: 'RFID-D404',
-            qr_code: 'QR-PUP-2023-11223',
-            status: 'suspended',
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-          },
-          {
-            id: 'f1e2d3c4-b5a6-4978-8899-aabbccddeeff',
-            student_number: 'VIS-2024-889',
-            first_name: 'Corazon',
-            middle_name: '',
-            last_name: 'Aquino',
-            person_type: 'visitor',
-            course: '',
-            department: 'Guest Lecturer',
-            year_level: null,
-            section: '',
-            contact_number: '09201234567',
-            rfid_uid: null,
-            qr_code: 'QR-VIS-2024-889',
-            status: 'active',
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-          },
-        ]);
+        setStudents([]);
       }
     } catch {
-      // ignore
+      setStudents([]);
     } finally {
       setLoading(false);
     }

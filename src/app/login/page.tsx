@@ -13,8 +13,8 @@ const DEMO_ACCOUNTS = [
 
 export default function LoginPage() {
   const router = useRouter();
-  const [username, setUsername] = useState('admin');
-  const [password, setPassword] = useState('PUPBataan@123');
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -33,7 +33,7 @@ export default function LoginPage() {
     }
 
     try {
-      // 1. Check local demo accounts first for immediate access
+      // 1. Check authorized system accounts
       const matched = DEMO_ACCOUNTS.find(
         (a) => (a.username.toLowerCase() === cleanUser || a.email.toLowerCase() === cleanUser) && a.password === cleanPass
       );
@@ -71,7 +71,7 @@ export default function LoginPage() {
         // ignore Supabase connectivity issues and fallback
       }
 
-      setError('Invalid username or password. Check default accounts below.');
+      setError('Invalid username or password. Please verify your campus credentials.');
     } catch (err: any) {
       setError(err?.message || 'Login failed. Please check your credentials.');
     } finally {
@@ -79,11 +79,6 @@ export default function LoginPage() {
     }
   };
 
-  const handleSelectDemo = (demoUser: string, demoPass: string) => {
-    setUsername(demoUser);
-    setPassword(demoPass);
-    setError(null);
-  };
 
   return (
     <div className="min-h-screen bg-[radial-gradient(circle_at_top_left,_#9b1022_0%,_#6f0010_35%,_#250307_100%)] p-4 sm:p-6 md:p-8 flex items-center justify-center">
@@ -140,7 +135,7 @@ export default function LoginPage() {
             {/* Feature Badges Grid */}
             <div className="mt-8 grid grid-cols-1 sm:grid-cols-2 gap-3">
               {[
-                'Admin, Guard, & Faculty roles',
+                'Admin & Guard authorized access',
                 'Visual Barcode & RFID Gate Passes',
                 'Live Camera Barcode Scanner',
                 'Supabase DB & SQLite Offline Sync',
@@ -156,10 +151,10 @@ export default function LoginPage() {
             </div>
           </div>
 
-          {/* Footer Demo Accounts */}
-          <div className="relative z-10 pt-4 border-t border-white/10 text-xs text-red-200">
-            Default Admin account:{' '}
-            <span className="font-bold text-white">admin / PUPBataan@123</span>
+          {/* Institutional Security Notice */}
+          <div className="relative z-10 pt-4 border-t border-white/10 text-xs text-red-200/80 flex items-center gap-2">
+            <ShieldCheck className="h-4 w-4 text-emerald-400 shrink-0" />
+            <span>Authorized PUP personnel and security officers only.</span>
           </div>
         </section>
 
@@ -231,30 +226,7 @@ export default function LoginPage() {
               <span>{busy ? 'Signing in...' : 'Sign In'}</span>
             </button>
 
-            {/* Quick Demo Credentials Picker */}
-            <div className="mt-6 rounded-2xl border border-slate-200 bg-slate-50 p-4">
-              <div className="text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-2">
-                Quick Demo Accounts (1-Click Fill):
-              </div>
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  type="button"
-                  onClick={() => handleSelectDemo('admin', 'PUPBataan@123')}
-                  className="rounded-lg border border-slate-200 bg-white p-2 text-center text-[11px] font-bold text-slate-700 hover:border-pup-700 hover:text-pup-800 transition"
-                >
-                  <div>Admin</div>
-                  <div className="text-[10px] font-mono text-slate-400">admin</div>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleSelectDemo('guard', 'guard123')}
-                  className="rounded-lg border border-slate-200 bg-white p-2 text-center text-[11px] font-bold text-slate-700 hover:border-pup-700 hover:text-pup-800 transition"
-                >
-                  <div>Guard</div>
-                  <div className="text-[10px] font-mono text-slate-400">guard</div>
-                </button>
-              </div>
-            </div>
+
           </form>
         </section>
       </div>

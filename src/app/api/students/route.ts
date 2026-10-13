@@ -2,6 +2,24 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getAdminClient } from '@/lib/supabase/admin';
 import { StudentFormSchema } from '@/lib/validation/schemas';
 import { isValidUUID } from '@/lib/utils';
+export async function GET() {
+  try {
+    const supabase = getAdminClient();
+    const { data, error } = await supabase
+      .from('students')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('[GET_STUDENTS_ERROR]', error);
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+
+    return NextResponse.json({ success: true, data: data || [] });
+  } catch (err: any) {
+    return NextResponse.json({ error: err?.message || 'Server error' }, { status: 500 });
+  }
+}
 
 export async function POST(request: NextRequest) {
   try {

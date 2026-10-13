@@ -10,12 +10,10 @@ export async function middleware(request: NextRequest) {
 
   const pathname = request.nextUrl.pathname;
 
-  // Paths that do not require authentication
+  // Paths that do not require page authentication redirect
   const isPublicRoute =
     pathname.startsWith('/login') ||
-    pathname.startsWith('/api/scan') ||
-    pathname.startsWith('/api/sync') ||
-    pathname.startsWith('/api/health') ||
+    pathname.startsWith('/api/') ||
     pathname.startsWith('/_next') ||
     pathname.includes('.') || // static files like logo200.svg
     pathname === '/favicon.ico';
