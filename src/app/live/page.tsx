@@ -195,11 +195,60 @@ export default function LiveScannerPage() {
   };
 
   // -------------------------------------------------------------
+  // CAMERA DEVICE CONFLICT VALIDATION HELPER
+  // -------------------------------------------------------------
+  const isCameraInUseByOtherGate = (
+    gate: 'entrance' | 'exit',
+    deviceIdToUse?: string
+  ): { inConflict: boolean; conflictingGate: string } => {
+    const defaultEntrance = videoDevices[0]?.deviceId || '';
+    const defaultExit =
+      (videoDevices.length > 1 ? videoDevices[1]?.deviceId : videoDevices[0]?.deviceId) || '';
+
+    const effectiveEntranceDevice = entranceDeviceId || defaultEntrance;
+    const effectiveExitDevice = exitDeviceId || defaultExit;
+
+    if (gate === 'exit') {
+      if (!entranceActive) return { inConflict: false, conflictingGate: '' };
+      // If entrance is active and only 1 camera device exists in the system
+      if (videoDevices.length <= 1) {
+        return { inConflict: true, conflictingGate: 'Entrance Gate (GATE-01)' };
+      }
+      const candidateExit = deviceIdToUse || effectiveExitDevice;
+      if (candidateExit === effectiveEntranceDevice) {
+        return { inConflict: true, conflictingGate: 'Entrance Gate (GATE-01)' };
+      }
+    } else {
+      // gate === 'entrance'
+      if (!exitActive) return { inConflict: false, conflictingGate: '' };
+      if (videoDevices.length <= 1) {
+        return { inConflict: true, conflictingGate: 'Exit Gate (GATE-02)' };
+      }
+      const candidateEntrance = deviceIdToUse || effectiveEntranceDevice;
+      if (candidateEntrance === effectiveExitDevice) {
+        return { inConflict: true, conflictingGate: 'Exit Gate (GATE-02)' };
+      }
+    }
+
+    return { inConflict: false, conflictingGate: '' };
+  };
+
+  // -------------------------------------------------------------
   // ENTRANCE CAMERA CONTROLS (GATE-01 • Inbound Entry)
   // -------------------------------------------------------------
   const startEntranceCamera = async (overrideDeviceId?: string) => {
     setEntranceError(null);
     const chosenDeviceId = overrideDeviceId || entranceDeviceId;
+
+    // Check device conflict: Cannot use camera currently running on Exit
+    const conflictCheck = isCameraInUseByOtherGate('entrance', chosenDeviceId);
+    if (conflictCheck.inConflict) {
+      setEntranceError(
+        `Camera Conflict Error: This camera is already active on the ${conflictCheck.conflictingGate}. A single camera cannot be shared simultaneously for both Entrance and Exit. Please choose a different camera.`
+      );
+      setEntranceActive(false);
+      return;
+    }
 
     try {
       const codeReader = new BrowserMultiFormatReader(createReaderHints(), {
@@ -266,11 +315,22 @@ export default function LiveScannerPage() {
       entranceVideoRef.current.srcObject = null;
     }
     setEntranceActive(false);
+    // Clear Exit conflict error if it was blocked by Entrance
+    setExitError((prev) => (prev && prev.includes('Entrance Gate') ? null : prev));
   };
 
   // Switch entrance camera device dynamically
   const handleSwitchEntranceCamera = async (newDeviceId: string) => {
     setEntranceDeviceId(newDeviceId);
+    const conflictCheck = isCameraInUseByOtherGate('entrance', newDeviceId);
+    if (conflictCheck.inConflict) {
+      setEntranceError(
+        `Camera Conflict Error: Cannot switch Entrance to this camera because it is currently in use by ${conflictCheck.conflictingGate}. Please select a different camera.`
+      );
+      stopEntranceCamera();
+      return;
+    }
+    setEntranceError(null);
     if (entranceActive) {
       stopEntranceCamera();
       setTimeout(() => {
@@ -285,6 +345,16 @@ export default function LiveScannerPage() {
   const startExitCamera = async (overrideDeviceId?: string) => {
     setExitError(null);
     const chosenDeviceId = overrideDeviceId || exitDeviceId;
+
+    // Check device conflict: Cannot use camera currently running on Entrance
+    const conflictCheck = isCameraInUseByOtherGate('exit', chosenDeviceId);
+    if (conflictCheck.inConflict) {
+      setExitError(
+        `Camera Conflict Error: This camera is already active on the ${conflictCheck.conflictingGate}. A single camera cannot be shared simultaneously for both Entrance and Exit. Please choose a different camera.`
+      );
+      setExitActive(false);
+      return;
+    }
 
     try {
       const codeReader = new BrowserMultiFormatReader(createReaderHints(), {
@@ -351,11 +421,22 @@ export default function LiveScannerPage() {
       exitVideoRef.current.srcObject = null;
     }
     setExitActive(false);
+    // Clear Entrance conflict error if it was blocked by Exit
+    setEntranceError((prev) => (prev && prev.includes('Exit Gate') ? null : prev));
   };
 
   // Switch exit camera device dynamically
   const handleSwitchExitCamera = async (newDeviceId: string) => {
     setExitDeviceId(newDeviceId);
+    const conflictCheck = isCameraInUseByOtherGate('exit', newDeviceId);
+    if (conflictCheck.inConflict) {
+      setExitError(
+        `Camera Conflict Error: Cannot switch Exit to this camera because it is currently in use by ${conflictCheck.conflictingGate}. Please select a different camera.`
+      );
+      stopExitCamera();
+      return;
+    }
+    setExitError(null);
     if (exitActive) {
       stopExitCamera();
       setTimeout(() => {
@@ -366,6 +447,25 @@ export default function LiveScannerPage() {
 
   // Start both cameras simultaneously
   const startBothCameras = async () => {
+    setEntranceError(null);
+    setExitError(null);
+
+    const defaultEntrance = videoDevices[0]?.deviceId || '';
+    const defaultExit =
+      (videoDevices.length > 1 ? videoDevices[1]?.deviceId : videoDevices[0]?.deviceId) || '';
+    const targetEntrance = entranceDeviceId || defaultEntrance;
+    const targetExit = exitDeviceId || defaultExit;
+
+    if (targetEntrance === targetExit || videoDevices.length <= 1) {
+      // Start Entrance camera
+      await startEntranceCamera(targetEntrance);
+      // Display explicit conflict error for Exit camera
+      setExitError(
+        'Camera Conflict Error: This camera is already in use by Entrance Gate (GATE-01). Operating both gates concurrently requires two distinct cameras. Please select another camera device for Exit.'
+      );
+      return;
+    }
+
     await startEntranceCamera();
     await startExitCamera();
   };
@@ -465,6 +565,19 @@ export default function LiveScannerPage() {
           </div>
         </div>
 
+        {/* Single Camera Detected Notice in Dual Mode */}
+        {viewMode === 'dual' && videoDevices.length === 1 && (
+          <div className="flex items-center gap-3 rounded-2xl border border-amber-300 bg-amber-50 p-4 text-xs text-amber-950 shadow-sm">
+            <AlertTriangle className="h-5 w-5 text-amber-600 shrink-0" />
+            <div className="space-y-0.5">
+              <span className="font-bold">Single Video Input Detected</span>
+              <p className="text-amber-800 leading-relaxed">
+                Only 1 camera is available on this system. Entrance and Exit cannot share the same physical camera stream at the same time. To run both gates simultaneously, plug in a second USB camera.
+              </p>
+            </div>
+          </div>
+        )}
+
         {/* Main Grid: Cameras on Left / Top, Scan Verification Result on Right */}
         <div className="grid gap-6 lg:grid-cols-12">
           {/* Left Column: Camera Feeds */}
@@ -517,14 +630,32 @@ export default function LiveScannerPage() {
                   <select
                     value={entranceDeviceId}
                     onChange={(e) => handleSwitchEntranceCamera(e.target.value)}
-                    className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-800 outline-none focus:border-emerald-600"
+                    className={`w-full rounded-xl border px-3 py-2 text-xs font-semibold outline-none transition ${
+                      exitActive &&
+                      (entranceDeviceId === exitDeviceId ||
+                        (!entranceDeviceId && !exitDeviceId) ||
+                        videoDevices.length <= 1)
+                        ? 'border-rose-400 bg-rose-50/50 text-rose-900 focus:border-rose-500 ring-1 ring-rose-300'
+                        : 'border-slate-300 bg-white text-slate-800 focus:border-emerald-600'
+                    }`}
                   >
                     {videoDevices.length > 0 ? (
-                      videoDevices.map((d, idx) => (
-                        <option key={d.deviceId || idx} value={d.deviceId}>
-                          📷 {d.label || `Camera ${idx + 1} (${d.deviceId.slice(0, 8)})`}
-                        </option>
-                      ))
+                      videoDevices.map((d, idx) => {
+                        const isConflict =
+                          exitActive &&
+                          (d.deviceId ===
+                            (exitDeviceId ||
+                              (videoDevices.length > 1
+                                ? videoDevices[1]?.deviceId
+                                : videoDevices[0]?.deviceId)) ||
+                            videoDevices.length <= 1);
+                        return (
+                          <option key={d.deviceId || idx} value={d.deviceId}>
+                            📷 {d.label || `Camera ${idx + 1} (${d.deviceId.slice(0, 8)})`}
+                            {isConflict ? ' ⚠️ [In Use by Exit (GATE-02)]' : ''}
+                          </option>
+                        );
+                      })
                     ) : (
                       <option value="">Default System Webcam</option>
                     )}
@@ -602,8 +733,12 @@ export default function LiveScannerPage() {
                 </div>
 
                 {entranceError && (
-                  <div className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs text-rose-800 font-semibold">
-                    {entranceError}
+                  <div className="rounded-2xl border border-rose-300 bg-rose-50 p-3.5 text-xs text-rose-950 shadow-sm flex items-start gap-3">
+                    <AlertTriangle className="h-5 w-5 text-rose-600 shrink-0 mt-0.5" />
+                    <div className="space-y-0.5">
+                      <p className="font-bold text-rose-950">Camera Configuration Error</p>
+                      <p className="text-rose-800 leading-relaxed">{entranceError}</p>
+                    </div>
                   </div>
                 )}
               </div>
@@ -655,14 +790,28 @@ export default function LiveScannerPage() {
                   <select
                     value={exitDeviceId}
                     onChange={(e) => handleSwitchExitCamera(e.target.value)}
-                    className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-800 outline-none focus:border-rose-600"
+                    className={`w-full rounded-xl border px-3 py-2 text-xs font-semibold outline-none transition ${
+                      entranceActive &&
+                      (exitDeviceId === entranceDeviceId ||
+                        (!exitDeviceId && !entranceDeviceId) ||
+                        videoDevices.length <= 1)
+                        ? 'border-rose-400 bg-rose-50/50 text-rose-900 focus:border-rose-500 ring-1 ring-rose-300'
+                        : 'border-slate-300 bg-white text-slate-800 focus:border-rose-600'
+                    }`}
                   >
                     {videoDevices.length > 0 ? (
-                      videoDevices.map((d, idx) => (
-                        <option key={d.deviceId || idx} value={d.deviceId}>
-                          📷 {d.label || `Camera ${idx + 1} (${d.deviceId.slice(0, 8)})`}
-                        </option>
-                      ))
+                      videoDevices.map((d, idx) => {
+                        const isConflict =
+                          entranceActive &&
+                          (d.deviceId === (entranceDeviceId || videoDevices[0]?.deviceId) ||
+                            videoDevices.length <= 1);
+                        return (
+                          <option key={d.deviceId || idx} value={d.deviceId}>
+                            📷 {d.label || `Camera ${idx + 1} (${d.deviceId.slice(0, 8)})`}
+                            {isConflict ? ' ⚠️ [In Use by Entrance (GATE-01)]' : ''}
+                          </option>
+                        );
+                      })
                     ) : (
                       <option value="">Default System Webcam</option>
                     )}
@@ -740,8 +889,12 @@ export default function LiveScannerPage() {
                 </div>
 
                 {exitError && (
-                  <div className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs text-rose-800 font-semibold">
-                    {exitError}
+                  <div className="rounded-2xl border border-rose-300 bg-rose-50 p-3.5 text-xs text-rose-950 shadow-sm flex items-start gap-3">
+                    <AlertTriangle className="h-5 w-5 text-rose-600 shrink-0 mt-0.5" />
+                    <div className="space-y-0.5">
+                      <p className="font-bold text-rose-950">Camera Configuration Error</p>
+                      <p className="text-rose-800 leading-relaxed">{exitError}</p>
+                    </div>
                   </div>
                 )}
               </div>
