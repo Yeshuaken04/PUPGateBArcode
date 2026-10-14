@@ -1,72 +1,37 @@
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
+import Link from 'next/link';
 import DashboardLayout from '@/components/DashboardLayout';
 import {
   Car,
   Search,
-  Plus,
   RefreshCw,
-  X,
   CheckCircle2,
-  AlertTriangle,
-  UserCheck,
-  ShieldCheck,
-  ShieldAlert,
-  Edit,
   Trash2,
+  ExternalLink,
+  ShieldCheck,
+  Bike,
 } from 'lucide-react';
-import { createClient } from '@/lib/supabase/client';
-import { isValidUUID } from '@/lib/utils';
-import { Vehicle, Student } from '@/types/database';
-import { VehicleFormSchema } from '@/lib/validation/schemas';
+import { Vehicle } from '@/types/database';
 
 export default function VehiclesPage() {
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
-  const [students, setStudents] = useState<Student[]>([]);
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(false);
-  const [modalOpen, setModalOpen] = useState(false);
-  const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
-  const [studentSearchQuery, setStudentSearchQuery] = useState('');
-  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
-  const [submitError, setSubmitError] = useState<string | null>(null);
-
-  const [form, setForm] = useState({
-    id: '',
-    student_id: '',
-    plate_number: '',
-    brand_model: '',
-    vehicle_type: 'motorcycle' as 'motorcycle' | 'car' | 'van' | 'bicycle' | 'other',
-    color: 'Black',
-  });
 
   const loadData = async () => {
     setLoading(true);
     try {
-      const [vRes, sRes] = await Promise.all([
-        fetch('/api/vehicles'),
-        fetch('/api/students'),
-      ]);
-      const [vJson, sJson] = await Promise.all([
-        vRes.json(),
-        sRes.json(),
-      ]);
-
-      if (vRes.ok && vJson.data) {
-        setVehicles(vJson.data);
+      const res = await fetch('/api/vehicles', { cache: 'no-store' });
+      const json = await res.json();
+      if (res.ok && json.data) {
+        setVehicles(json.data);
       } else {
         setVehicles([]);
       }
-
-      if (sRes.ok && sJson.data) {
-        setStudents(sJson.data.filter((s: Student) => s.status === 'active'));
-      } else {
-        setStudents([]);
-      }
     } catch {
       setVehicles([]);
-      setStudents([]);
     } finally {
       setLoading(false);
     }
@@ -88,138 +53,86 @@ export default function VehiclesPage() {
     });
   }, [vehicles, search]);
 
-  // Filter students in dropdown
-  const matchedStudents = useMemo(() => {
-    const q = studentSearchQuery.trim().toLowerCase();
-    if (!q) return students.slice(0, 10);
-    return students.filter((s) => {
-      const full = `${s.first_name} ${s.last_name}`.toLowerCase();
-      const num = s.student_number.toLowerCase();
-      return full.includes(q) || num.includes(q);
-    }).slice(0, 10);
-  }, [students, studentSearchQuery]);
-
-  const handleOpenModal = () => {
-    setForm({
-      id: '',
-      student_id: '',
-      plate_number: '',
-      brand_model: '',
-      vehicle_type: 'motorcycle',
-      color: 'Black',
-    });
-    setSelectedStudent(null);
-    setStudentSearchQuery('');
-    setFormErrors({});
-    setSubmitError(null);
-    setModalOpen(true);
-  };
-
-  const handleEditVehicle = (v: Vehicle) => {
-    setForm({
-      id: v.id,
-      student_id: v.student_id,
-      plate_number: v.plate_number,
-      brand_model: v.brand_model,
-      vehicle_type: v.vehicle_type as any,
-      color: v.color || '',
-    });
-    if (v.student) {
-      setSelectedStudent(v.student);
-    } else {
-      const match = students.find((s) => s.id === v.student_id);
-      setSelectedStudent(match || null);
-    }
-    setStudentSearchQuery('');
-    setFormErrors({});
-    setSubmitError(null);
-    setModalOpen(true);
-  };
-
   const handleDeleteVehicle = async (v: Vehicle) => {
-    if (!confirm(`Are you sure you want to delete the vehicle with plate "${v.plate_number}"?`)) return;
+    if (!confirm(`Are you sure you want to revoke the vehicle pass with plate "${v.plate_number}"?`)) return;
     try {
       const res = await fetch(`/api/vehicles?id=${encodeURIComponent(v.id)}`, {
         method: 'DELETE',
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Failed to delete vehicle.');
+      if (!res.ok) throw new Error(data.error || 'Failed to revoke vehicle pass.');
       loadData();
     } catch (err: any) {
-      alert(err?.message || 'Error while deleting vehicle.');
+      alert(err?.message || 'Error while revoking vehicle pass.');
     }
   };
 
-  const handleSaveVehicle = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setSubmitError(null);
-    setFormErrors({});
-
-    if (!selectedStudent) {
-      setFormErrors((prev) => ({
-        ...prev,
-        student_id: 'Please select a registered Student or Faculty member from the database.',
-      }));
-      setSubmitError('Please select a vehicle owner from the database.');
-      return;
-    }
-
-    // Validate using VehicleFormSchema
-    const validationResult = VehicleFormSchema.safeParse({
-      student_id: selectedStudent.id,
-      plate_number: form.plate_number.trim().toUpperCase(),
-      brand_model: form.brand_model.trim(),
-      vehicle_type: form.vehicle_type,
-      color: form.color.trim() || null,
-    });
-
-    if (!validationResult.success) {
-      const fieldErrors: Record<string, string> = {};
-      validationResult.error.errors.forEach((err) => {
-        const field = err.path[0] as string;
-        if (field && !fieldErrors[field]) {
-          fieldErrors[field] = err.message;
-        }
-      });
-      setFormErrors(fieldErrors);
-      setSubmitError('Please correct highlighted fields before saving.');
-      return;
-    }
-
-    try {
-      const payload = {
-        id: form.id || undefined,
-        student_id: selectedStudent.id || selectedStudent.student_number,
-        plate_number: form.plate_number.trim().toUpperCase(),
-        brand_model: form.brand_model.trim(),
-        vehicle_type: form.vehicle_type,
-        color: form.color.trim() || null,
-      };
-
-      const res = await fetch('/api/vehicles', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-
-      const resData = await res.json();
-      if (!res.ok) {
-        throw new Error(resData.error || 'Failed to save vehicle. Please check if this plate number is already registered.');
-      }
-
-      setModalOpen(false);
-      loadData();
-    } catch (err: any) {
-      setSubmitError(err?.message || 'Failed to save vehicle. Please check if this plate number is already registered.');
-    }
-  };
+  const motorcycleCount = useMemo(() => vehicles.filter((v) => v.vehicle_type === 'motorcycle').length, [vehicles]);
+  const carCount = useMemo(() => vehicles.filter((v) => v.vehicle_type === 'car').length, [vehicles]);
 
   return (
     <DashboardLayout
-      title="Campus Vehicle Pass & RFID Registry"
-      subtitle="Registered motorcycles and vehicles for students and faculty with automated barrier access"
+      title="Campus Registered Vehicles"
+      subtitle="View-only directory of authorized vehicles and motorcycles linked to student and faculty profiles."
     >
       <div className="space-y-4">
+        {/* Notice Banner */}
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 rounded-2xl border border-pup-200 bg-pup-50/60 p-4 shadow-sm">
+          <div className="flex items-center gap-3">
+            <div className="rounded-xl bg-pup-100 p-2.5 text-pup-800">
+              <ShieldCheck className="h-5 w-5" />
+            </div>
+            <div>
+              <div className="text-xs font-bold text-pup-950 uppercase tracking-wide">
+                Unified Vehicle Registration
+              </div>
+              <div className="text-xs text-pup-800">
+                New vehicle passes are registered and updated directly within the{' '}
+                <span className="font-bold">Student Directory</span>.
+              </div>
+            </div>
+          </div>
+          <Link
+            href="/students"
+            className="flex items-center gap-1.5 rounded-xl bg-pup-700 px-4 py-2 text-xs font-bold text-white shadow-sm hover:bg-pup-800 transition whitespace-nowrap"
+          >
+            <span>Open Student Directory</span>
+            <ExternalLink className="h-3.5 w-3.5" />
+          </Link>
+        </div>
+
+        {/* Quick Stats */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <div className="rounded-2xl border border-slate-200 bg-white p-3.5 shadow-sm">
+            <div className="flex items-center justify-between text-xs font-bold text-slate-500 uppercase">
+              <span>Total Passes</span>
+              <Car className="h-4 w-4 text-pup-700" />
+            </div>
+            <div className="mt-1 text-2xl font-black text-slate-900">{vehicles.length}</div>
+          </div>
+          <div className="rounded-2xl border border-slate-200 bg-white p-3.5 shadow-sm">
+            <div className="flex items-center justify-between text-xs font-bold text-slate-500 uppercase">
+              <span>Motorcycles</span>
+              <Bike className="h-4 w-4 text-sky-600" />
+            </div>
+            <div className="mt-1 text-2xl font-black text-sky-900">{motorcycleCount}</div>
+          </div>
+          <div className="rounded-2xl border border-slate-200 bg-white p-3.5 shadow-sm">
+            <div className="flex items-center justify-between text-xs font-bold text-slate-500 uppercase">
+              <span>Cars & Vans</span>
+              <Car className="h-4 w-4 text-amber-600" />
+            </div>
+            <div className="mt-1 text-2xl font-black text-amber-900">{carCount}</div>
+          </div>
+          <div className="rounded-2xl border border-slate-200 bg-white p-3.5 shadow-sm">
+            <div className="flex items-center justify-between text-xs font-bold text-slate-500 uppercase">
+              <span>Active Status</span>
+              <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+            </div>
+            <div className="mt-1 text-2xl font-black text-emerald-800">100%</div>
+          </div>
+        </div>
+
         {/* Top Controls */}
         <div className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between">
           <div className="relative flex-1 max-w-md">
@@ -237,16 +150,10 @@ export default function VehiclesPage() {
             <button
               onClick={loadData}
               title="Refresh list"
-              className="rounded-xl border border-slate-300 p-2.5 text-slate-600 hover:bg-slate-50"
+              className="flex items-center gap-1.5 rounded-xl border border-slate-300 px-3.5 py-2.5 text-xs font-bold text-slate-700 hover:bg-slate-50 transition cursor-pointer"
             >
               <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-            </button>
-            <button
-              onClick={handleOpenModal}
-              className="flex items-center gap-1.5 rounded-xl bg-pup-700 px-4 py-2.5 text-xs font-bold text-white shadow-sm hover:bg-pup-800 transition"
-            >
-              <Plus className="h-4 w-4" />
-              <span>Register Vehicle</span>
+              <span>Refresh</span>
             </button>
           </div>
         </div>
@@ -265,7 +172,7 @@ export default function VehiclesPage() {
                   <th className="px-4 py-3">Vehicle Type</th>
                   <th className="px-4 py-3">Color</th>
                   <th className="px-4 py-3">Barrier Pass Status</th>
-                  <th className="px-4 py-3 text-right">Action</th>
+                  <th className="px-4 py-3 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -285,8 +192,8 @@ export default function VehiclesPage() {
                           className={`inline-flex rounded-md px-2 py-0.5 text-[10px] font-bold uppercase ${
                             v.student?.person_type === 'faculty'
                               ? 'bg-blue-100 text-blue-800'
-                              : v.student?.person_type === 'staff'
-                              ? 'bg-purple-100 text-purple-800'
+                              : v.student?.person_type === 'visitor'
+                              ? 'bg-amber-100 text-amber-800'
                               : 'bg-emerald-100 text-emerald-800'
                           }`}
                         >
@@ -306,17 +213,17 @@ export default function VehiclesPage() {
                       </td>
                       <td className="whitespace-nowrap px-4 py-3 text-right">
                         <div className="flex items-center justify-end gap-1">
-                          <button
-                            onClick={() => handleEditVehicle(v)}
-                            title="Edit Vehicle"
+                          <Link
+                            href={`/students?search=${encodeURIComponent(v.plate_number)}`}
+                            title="Manage Profile in Student Directory"
                             className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100 hover:text-pup-700 transition"
                           >
-                            <Edit className="h-4 w-4" />
-                          </button>
+                            <ExternalLink className="h-4 w-4" />
+                          </Link>
                           <button
                             onClick={() => handleDeleteVehicle(v)}
-                            title="Delete Vehicle"
-                            className="rounded-lg p-1.5 text-slate-400 hover:bg-rose-50 hover:text-rose-600 transition"
+                            title="Revoke Vehicle Pass"
+                            className="rounded-lg p-1.5 text-slate-400 hover:bg-rose-50 hover:text-rose-600 transition cursor-pointer"
                           >
                             <Trash2 className="h-4 w-4" />
                           </button>
@@ -336,269 +243,6 @@ export default function VehiclesPage() {
           </div>
         </div>
       </div>
-
-      {/* Strict Vehicle Registration Modal */}
-      {modalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-lg rounded-3xl bg-white p-6 shadow-2xl max-h-[92vh] overflow-y-auto">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <div>
-                <h3 className="text-base font-black text-slate-900">
-                  {form.id ? 'Edit Vehicle Pass' : 'Register Vehicle Pass'}
-                </h3>
-                <p className="text-xs text-slate-500">
-                  Owner must be a verified student or faculty member in the database.
-                </p>
-              </div>
-              <button
-                onClick={() => setModalOpen(false)}
-                className="rounded-lg p-1 text-slate-400 hover:bg-slate-100"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-
-            {submitError && (
-              <div className="mt-3 flex items-start gap-2 rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs font-semibold text-rose-800">
-                <AlertTriangle className="h-4 w-4 text-rose-600 shrink-0 mt-0.5" />
-                <div>{submitError}</div>
-              </div>
-            )}
-
-            <form onSubmit={handleSaveVehicle} className="mt-4 space-y-3.5">
-              {/* Step 1: Student / Faculty Verification Picker */}
-              <div>
-                <label className="block text-xs font-bold uppercase text-slate-600 mb-1">
-                  1. Vehicle Owner (Verified in Database) *
-                </label>
-                {selectedStudent ? (
-                  <div className="flex items-center justify-between rounded-xl border border-emerald-300 bg-emerald-50/70 p-3">
-                    <div className="flex items-center gap-2.5">
-                      <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-600 text-white font-bold text-xs">
-                        <UserCheck className="h-4 w-4" />
-                      </div>
-                      <div>
-                        <div className="text-xs font-black text-emerald-950">
-                          {selectedStudent.first_name} {selectedStudent.last_name}
-                        </div>
-                        <div className="text-[11px] text-emerald-700">
-                          {selectedStudent.student_number} • {selectedStudent.person_type.toUpperCase()}
-                        </div>
-                      </div>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setSelectedStudent(null);
-                        setStudentSearchQuery('');
-                      }}
-                      className="text-xs font-bold text-slate-500 hover:text-rose-600"
-                    >
-                      Change
-                    </button>
-                  </div>
-                ) : (
-                  <div className="space-y-2">
-                    <input
-                      type="text"
-                      value={studentSearchQuery}
-                      onChange={(e) => setStudentSearchQuery(e.target.value)}
-                      placeholder="Type name or ID number to search registered owners..."
-                      className="w-full rounded-xl border border-slate-300 px-3 py-2 text-xs outline-none focus:border-pup-700"
-                    />
-                    <div className="max-h-36 overflow-y-auto rounded-xl border border-slate-200 bg-slate-50/50 p-1 divide-y divide-slate-100">
-                      {matchedStudents.length > 0 ? (
-                        matchedStudents.map((s) => (
-                          <div
-                            key={s.id}
-                            onClick={() => {
-                              setSelectedStudent(s);
-                              setFormErrors((prev) => {
-                                const copy = { ...prev };
-                                delete copy.student_id;
-                                return copy;
-                              });
-                            }}
-                            className="flex items-center justify-between p-2 hover:bg-pup-50 rounded-lg cursor-pointer transition text-xs"
-                          >
-                            <div>
-                              <span className="font-bold text-slate-900">
-                                {s.first_name} {s.last_name}
-                              </span>
-                              <span className="ml-2 font-mono text-[11px] text-slate-500">
-                                ({s.student_number})
-                              </span>
-                            </div>
-                            <span className="rounded bg-slate-200 px-1.5 py-0.5 text-[10px] font-bold uppercase text-slate-700">
-                              {s.person_type}
-                            </span>
-                          </div>
-                        ))
-                      ) : (
-                        <div className="p-3 text-center text-xs text-slate-400">
-                          No active students or faculty found in database.
-                        </div>
-                      )}
-                    </div>
-                    {formErrors.student_id && (
-                      <span className="text-[11px] text-rose-600 font-semibold block">
-                        {formErrors.student_id}
-                      </span>
-                    )}
-                  </div>
-                )}
-              </div>
-
-              {/* Step 2: License Plate (Strict check against -1 or invalid format) */}
-              <div>
-                <label className="block text-xs font-bold uppercase text-slate-600 mb-1">
-                  2. License Plate Number *
-                </label>
-                <input
-                  required
-                  value={form.plate_number}
-                  onChange={(e) => {
-                    const val = e.target.value.toUpperCase();
-                    setForm({ ...form, plate_number: val });
-                    if (val === '-1' || val.startsWith('-')) {
-                      setFormErrors((prev) => ({
-                        ...prev,
-                        plate_number: 'Negative values or "-1" are not allowed.',
-                      }));
-                    } else {
-                      setFormErrors((prev) => {
-                        const copy = { ...prev };
-                        delete copy.plate_number;
-                        return copy;
-                      });
-                    }
-                  }}
-                  placeholder="e.g. ABC-1234 or ABC-123"
-                  className={`w-full rounded-xl border px-3 py-2 text-sm font-mono font-black uppercase outline-none ${
-                    formErrors.plate_number
-                      ? 'border-rose-500 bg-rose-50/30'
-                      : 'border-slate-300 focus:border-pup-700'
-                  }`}
-                />
-                {formErrors.plate_number && (
-                  <span className="text-[11px] text-rose-600 font-semibold mt-1 block">
-                    {formErrors.plate_number}
-                  </span>
-                )}
-              </div>
-
-              {/* Step 3: Brand & Model */}
-              <div>
-                <label className="block text-xs font-bold uppercase text-slate-600 mb-1">
-                  3. Brand & Model *
-                </label>
-                <input
-                  required
-                  value={form.brand_model}
-                  onChange={(e) => {
-                    const val = e.target.value;
-                    setForm({ ...form, brand_model: val });
-                    if (val === '-1') {
-                      setFormErrors((prev) => ({
-                        ...prev,
-                        brand_model: 'Negative values or "-1" are not allowed.',
-                      }));
-                    } else {
-                      setFormErrors((prev) => {
-                        const copy = { ...prev };
-                        delete copy.brand_model;
-                        return copy;
-                      });
-                    }
-                  }}
-                  placeholder="e.g. Yamaha Aerox 155, Honda Click, Toyota Vios"
-                  className={`w-full rounded-xl border px-3 py-2 text-sm outline-none ${
-                    formErrors.brand_model
-                      ? 'border-rose-500 bg-rose-50/30'
-                      : 'border-slate-300 focus:border-pup-700'
-                  }`}
-                />
-                {formErrors.brand_model && (
-                  <span className="text-[11px] text-rose-600 font-semibold mt-1 block">
-                    {formErrors.brand_model}
-                  </span>
-                )}
-              </div>
-
-              {/* Step 4: Vehicle Type & Color */}
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-bold uppercase text-slate-600 mb-1">
-                    Vehicle Type
-                  </label>
-                  <select
-                    value={form.vehicle_type}
-                    onChange={(e) => setForm({ ...form, vehicle_type: e.target.value as any })}
-                    className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm outline-none focus:border-pup-700"
-                  >
-                    <option value="motorcycle">Motorcycle</option>
-                    <option value="car">Car</option>
-                    <option value="van">Van</option>
-                    <option value="bicycle">Bicycle</option>
-                    <option value="other">Other</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-xs font-bold uppercase text-slate-600 mb-1">
-                    Color
-                  </label>
-                  <input
-                    value={form.color}
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      setForm({ ...form, color: val });
-                      if (val === '-1') {
-                        setFormErrors((prev) => ({
-                          ...prev,
-                          color: 'Negative values or "-1" are not allowed.',
-                        }));
-                      } else {
-                        setFormErrors((prev) => {
-                          const copy = { ...prev };
-                          delete copy.color;
-                          return copy;
-                        });
-                      }
-                    }}
-                    placeholder="Black / Red / White"
-                    className={`w-full rounded-xl border px-3 py-2 text-sm outline-none ${
-                      formErrors.color
-                        ? 'border-rose-500 bg-rose-50/30'
-                        : 'border-slate-300 focus:border-pup-700'
-                    }`}
-                  />
-                  {formErrors.color && (
-                    <span className="text-[11px] text-rose-600 font-semibold mt-1 block">
-                      {formErrors.color}
-                    </span>
-                  )}
-                </div>
-              </div>
-
-              <div className="flex gap-2 pt-4">
-                <button
-                  type="button"
-                  onClick={() => setModalOpen(false)}
-                  className="flex-1 rounded-xl border border-slate-300 py-2.5 text-xs font-bold text-slate-700 hover:bg-slate-50 transition"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="flex-1 rounded-xl bg-pup-700 py-2.5 text-xs font-bold text-white hover:bg-pup-800 transition shadow-sm"
-                >
-                  Save Vehicle Pass
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
     </DashboardLayout>
   );
 }
