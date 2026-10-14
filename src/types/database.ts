@@ -33,6 +33,7 @@ export interface Student {
   status: StudentStatus;
   created_at: string;
   updated_at: string;
+  vehicles?: Vehicle[];
 }
 
 export interface Vehicle {

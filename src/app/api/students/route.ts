@@ -10,7 +10,7 @@ export async function GET() {
     const supabase = getAdminClient();
     const { data, error } = await supabase
       .from('students')
-      .select('*')
+      .select('*, vehicles(*)')
       .order('created_at', { ascending: false });
 
     if (error) {
@@ -36,7 +36,7 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   try {
     const json = await request.json();
-    const { id, ...dataToValidate } = json;
+    const { id, vehicle, delete_vehicle_id, ...dataToValidate } = json;
 
     const validationResult = StudentFormSchema.safeParse(dataToValidate);
     if (!validationResult.success) {
@@ -68,6 +68,8 @@ export async function POST(request: NextRequest) {
       status: validData.status,
     };
 
+    let savedStudent: any = null;
+
     if (id && isValidUUID(id)) {
       const { data, error } = await supabase
         .from('students')
@@ -80,8 +82,7 @@ export async function POST(request: NextRequest) {
         console.error('[STUDENT_UPDATE_ERROR]', error);
         return NextResponse.json({ error: error.message }, { status: 500 });
       }
-
-      return NextResponse.json({ success: true, data });
+      savedStudent = data;
     } else {
       // Check existing by student_number
       const { data: existing } = await supabase
@@ -102,8 +103,7 @@ export async function POST(request: NextRequest) {
           console.error('[STUDENT_UPDATE_BY_NUM_ERROR]', error);
           return NextResponse.json({ error: error.message }, { status: 500 });
         }
-
-        return NextResponse.json({ success: true, data });
+        savedStudent = data;
       } else {
         const { data, error } = await supabase
           .from('students')
@@ -115,10 +115,44 @@ export async function POST(request: NextRequest) {
           console.error('[STUDENT_INSERT_ERROR]', error);
           return NextResponse.json({ error: error.message }, { status: 500 });
         }
-
-        return NextResponse.json({ success: true, data });
+        savedStudent = data;
       }
     }
+
+    // Handle Vehicle pass if provided or requested to delete
+    if (savedStudent?.id) {
+      if (delete_vehicle_id && isValidUUID(delete_vehicle_id)) {
+        await supabase.from('vehicles').delete().eq('id', delete_vehicle_id);
+      }
+
+      if (vehicle && vehicle.plate_number && vehicle.plate_number.trim()) {
+        const vehiclePayload = {
+          student_id: savedStudent.id,
+          plate_number: vehicle.plate_number.toUpperCase().trim(),
+          brand_model: (vehicle.brand_model || 'Unspecified').trim(),
+          vehicle_type: vehicle.vehicle_type || 'motorcycle',
+          color: vehicle.color ? vehicle.color.trim() : null,
+          is_active: true,
+        };
+
+        if (vehicle.id && isValidUUID(vehicle.id)) {
+          await supabase.from('vehicles').update(vehiclePayload).eq('id', vehicle.id);
+        } else {
+          await supabase
+            .from('vehicles')
+            .upsert(vehiclePayload, { onConflict: 'plate_number' });
+        }
+      }
+    }
+
+    // Return the updated student record with vehicles
+    const { data: fullRecord } = await supabase
+      .from('students')
+      .select('*, vehicles(*)')
+      .eq('id', savedStudent.id)
+      .single();
+
+    return NextResponse.json({ success: true, data: fullRecord || savedStudent });
   } catch (err: any) {
     console.error('[STUDENT_API_ERROR]', err);
     return NextResponse.json(
